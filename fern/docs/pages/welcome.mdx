@@ -1,0 +1,39 @@
+---
+title: Welcome
+description: ListBee developer documentation — one API call to sell and deliver digital content.
+---
+
+One API call to sell and deliver digital content.
+
+ListBee is listings infrastructure for AI agents. Create a listing with a title, price, and content — get back a product page URL. Buyers visit the URL, pay via Stripe, receive the content automatically.
+
+## How it works
+
+```
+Agent creates listing → ListBee hosts product page → Buyer pays → Content delivered
+```
+
+AI agents create and manage listings on behalf of sellers. Buyers are always humans who see a product page, pay via Stripe Checkout, and receive content after purchase.
+
+## Start here
+
+<Cards>
+  <Card title="Quickstart" href="/quickstart">
+    Three API calls: signup, connect Stripe, create listing.
+  </Card>
+  <Card title="API reference" href="/api-reference">
+    Every endpoint, every parameter, try-it panel.
+  </Card>
+  <Card title="Readiness system" href="/readiness">
+    How agents know what to do next.
+  </Card>
+</Cards>
+
+## For AI agents
+
+ListBee is built for agents to consume directly:
+
+- **OpenAPI spec:** [api.listbee.so/openapi.json](https://api.listbee.so/openapi.json)
+- **MCP server:** `npx listbee-mcp`
+- **Python SDK:** `pip install listbee`
+- **Machine-readable docs:** [/llms.txt](https://api.listbee.so/llms.txt)

@@ -1,0 +1,92 @@
+---
+title: Introduction
+description: What ListBee is, what problems it solves, and how the commerce model works.
+---
+
+ListBee is a REST API for creating and selling digital content. The primary resource is a **listing** — a product page with a title, price, and content payload. Create one, get back a URL. Buyers visit the URL, pay, receive the content.
+
+## Create a listing
+
+Three required fields: `name`, `price`, `currency`. Add `content` and the listing can sell immediately.
+
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+listing = client.listings.create(
+    name="Python Async Patterns",
+    price=1900,        # cents
+    currency="usd",
+    content="https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+)
+
+print(listing.url)        # https://buy.listbee.so/python-async-patterns
+print(listing.readiness.sellable)  # True — buyers can purchase now
+```
+
+The `url` field is the product page. Share it with buyers directly. No additional setup required if Stripe is already connected.
+
+## What problems it solves
+
+**No API for agents to sell.** Gumroad, Lemon Squeezy, and similar tools are console-only. An agent cannot create a listing programmatically without human intervention at every step.
+
+**No readiness feedback.** Existing tools give no machine-readable signal about whether a listing is ready to sell. Agents have no way to know what action is needed next.
+
+**Console-only account setup.** Connecting a payment method typically requires a human in a browser. ListBee's account setup is fully API-driven — including Stripe key submission.
+
+## ListBee vs alternatives
+
+| | ListBee | Gumroad | Stripe Payment Links |
+|---|---|---|---|
+| **Primary user** | AI agents | Creators | Developers |
+| **Listing creation** | REST API | Web console | Stripe dashboard |
+| **Content delivery** | Automatic via API | Automatic | Manual |
+| **Readiness feedback** | Yes — machine-readable | No | No |
+| **Setup time** | ~3 API calls | ~10 min in browser | ~5 min in dashboard |
+
+## Commerce model
+
+ListBee is agent-operated, human-facing commerce.
+
+- **Agents** call the API to create listings, update pricing, and manage content.
+- **Humans** visit product pages, pay via Stripe Checkout, and receive content by email.
+- **Money** flows from buyers through Stripe to the seller's connected Stripe account. ListBee takes a fee per order.
+
+Agents never touch payment data. Humans never interact with the API.
+
+## Pricing
+
+| Plan | Fee | Monthly |
+|---|---|---|
+| Free | 10% per order | $0 (up to 50 orders) |
+| Growth | 5% per order | $29 |
+| Scale | 3% per order | $79 |
+
+---
+
+## Copy for AI assistants
+
+```python
+# ListBee API — key facts for AI agents
+#
+# Base URL: https://api.listbee.so
+# Auth:     Authorization: Bearer lb_...
+#
+# Core flow:
+#   1. POST /v1/account/signup    { email }                  → OTP sent
+#   2. POST /v1/account/verify    { email, code }            → api_key
+#   3. POST /v1/account/stripe-key { secret_key }            → account.readiness.operational
+#   4. POST /v1/listings          { name, price, currency, content } → listing.url + readiness.sellable
+#
+# Listing response includes:
+#   - url:                product page URL (share with buyers)
+#   - readiness.sellable: True when buyers can purchase
+#   - readiness.actions:  list of actions needed if not sellable
+#   - readiness.next:     highest-priority action code
+#
+# ID prefixes: lst_ listing, ord_ order, acc_ account, lbk_ api-key entity, ag_ access grant
+# Errors: RFC 9457 Problem Details — { type, title, status, detail, code, param }
+# Docs:   https://docs.listbee.so
+# Spec:   https://api.listbee.so/openapi.json
+```

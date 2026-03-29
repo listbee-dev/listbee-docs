@@ -1,0 +1,222 @@
+---
+title: Quickstart
+description: Three API calls to go from zero to a live listing — account, Stripe, listing.
+---
+
+Three steps to go from zero to a live listing: create an account, connect Stripe, create a listing.
+
+---
+
+## Step 1: Create an account
+
+Send your email to receive a one-time code. Then verify the code to get your API key.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+BASE = "https://api.listbee.so"
+
+# 1a. Request OTP
+httpx.post(f"{BASE}/v1/account/signup", json={"email": "you@example.com"})
+
+# Check your inbox for the 6-digit code, then:
+
+# 1b. Verify and get API key
+resp = httpx.post(
+    f"{BASE}/v1/account/verify",
+    json={"email": "you@example.com", "code": "123456"},
+)
+data = resp.json()
+
+api_key = data["api_key"]           # lb_...
+account = data["account"]           # account object
+print(f"API key: {api_key}")
+print(f"Account: {account['id']}")  # acc_...
+```
+
+```typescript title="TypeScript"
+const BASE = "https://api.listbee.so";
+
+// 1a. Request OTP
+await fetch(`${BASE}/v1/account/signup`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email: "you@example.com" }),
+});
+
+// Check your inbox for the 6-digit code, then:
+
+// 1b. Verify and get API key
+const resp = await fetch(`${BASE}/v1/account/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email: "you@example.com", code: "123456" }),
+});
+const data = await resp.json();
+
+const apiKey = data.api_key;        // lb_...
+const account = data.account;       // account object
+console.log(`API key: ${apiKey}`);
+console.log(`Account: ${account.id}`); // acc_...
+```
+
+</CodeGroup>
+
+Store the API key — all subsequent requests use it as a Bearer token.
+
+---
+
+## Step 2: Connect Stripe
+
+Submit your Stripe secret key. ListBee stores it encrypted and uses it to process payments.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+BASE = "https://api.listbee.so"
+API_KEY = "lb_..."  # from step 1
+
+resp = httpx.post(
+    f"{BASE}/v1/account/stripe-key",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={"secret_key": "sk_live_..."},
+)
+account = resp.json()
+
+print(account["readiness"]["operational"])  # True — ready to sell
+```
+
+```typescript title="TypeScript"
+const BASE = "https://api.listbee.so";
+const API_KEY = "lb_..."; // from step 1
+
+const resp = await fetch(`${BASE}/v1/account/stripe-key`, {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ secret_key: "sk_live_..." }),
+});
+const account = await resp.json();
+
+console.log(account.readiness.operational); // true — ready to sell
+```
+
+</CodeGroup>
+
+`readiness.operational` is `true` when Stripe is connected and the account can process payments.
+
+<Note>
+Don't have a Stripe account yet? Call `POST /v1/account/stripe/connect` to start a Stripe Connect onboarding flow. You'll get back a URL to complete setup in your browser.
+</Note>
+
+---
+
+## Step 3: Create a listing
+
+Four required fields: `name`, `price` (in cents), `currency`, `content` (a URL or text payload).
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+BASE = "https://api.listbee.so"
+API_KEY = "lb_..."  # from step 1
+
+resp = httpx.post(
+    f"{BASE}/v1/listings",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={
+        "name": "Python Async Patterns",
+        "price": 1900,      # $19.00 in cents
+        "currency": "usd",
+        "content": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+    },
+)
+listing = resp.json()
+
+print(listing["url"])                      # https://buy.listbee.so/python-async-patterns
+print(listing["readiness"]["sellable"])    # True — buyers can purchase now
+```
+
+```typescript title="TypeScript"
+const BASE = "https://api.listbee.so";
+const API_KEY = "lb_..."; // from step 1
+
+const resp = await fetch(`${BASE}/v1/listings`, {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    name: "Python Async Patterns",
+    price: 1900,     // $19.00 in cents
+    currency: "usd",
+    content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+  }),
+});
+const listing = await resp.json();
+
+console.log(listing.url);                    // https://buy.listbee.so/python-async-patterns
+console.log(listing.readiness.sellable);     // true — buyers can purchase now
+```
+
+</CodeGroup>
+
+The `url` is the product page. Share it with buyers. When `readiness.sellable` is `true`, the listing is live.
+
+If `sellable` is `false`, check `readiness.actions` — each action has a `code`, `kind` (`api` or `human`), and a `resolve` object with the exact endpoint or URL to fix it.
+
+---
+
+## What's next
+
+<Cards>
+  <Card title="Listings" href="/listings">
+    Update content, pricing, cover images. Manage listing status.
+  </Card>
+  <Card title="Readiness system" href="/readiness">
+    How agents read and act on readiness signals.
+  </Card>
+  <Card title="Webhooks" href="/webhooks">
+    Get notified when orders complete or listings change.
+  </Card>
+  <Card title="Python SDK" href="/python-sdk">
+    Typed client — `pip install listbee`.
+  </Card>
+</Cards>
+
+---
+
+## Copy for AI assistants
+
+```python
+# ListBee quickstart — three steps from zero to a live listing
+#
+# Step 1: Account
+#   POST /v1/account/signup    { "email": "..." }
+#     → 200 { object, email, status, message }   (OTP sent)
+#   POST /v1/account/verify    { "email": "...", "code": "123456" }
+#     → 201 { object, account, api_key }
+#
+# Step 2: Stripe
+#   POST /v1/account/stripe-key  { "secret_key": "sk_live_..." }
+#     → 200 account object with readiness.operational: true
+#   (New Stripe users: POST /v1/account/stripe/connect → { url } to open in browser)
+#
+# Step 3: Listing
+#   POST /v1/listings  { "name", "price" (cents), "currency", "content" }
+#     → 201 { object, id, slug, url, readiness: { sellable, actions, next }, ... }
+#
+# All requests: Authorization: Bearer lb_...
+# Errors:       RFC 9457 { type, title, status, detail, code, param }
+# Docs:         https://docs.listbee.so
+# Spec:         https://api.listbee.so/openapi.json
+```

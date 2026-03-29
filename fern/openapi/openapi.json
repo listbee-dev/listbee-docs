@@ -1,0 +1,3697 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ListBee",
+    "summary": "One API call to sell and deliver digital content.",
+    "description": "ListBee is a commerce API for AI agents, n8n workflows, and automation platforms. Create a listing with a title, price, and content \u2014 get back a checkout URL. Buyers visit the URL, pay via Stripe, and receive the content automatically.\n\n## Quick Start\n1. Get an API key from the developer console\n2. Connect your Stripe account\n3. `POST /v1/listings` with title + price + content\n4. Share the checkout URL\n\n## Authentication\nPass your API key as a Bearer token: `Authorization: Bearer lb_...`",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/_api",
+      "description": "API server"
+    }
+  ],
+  "paths": {
+    "/v1/account/signup": {
+      "post": {
+        "tags": [
+          "Signup"
+        ],
+        "summary": "Start account creation",
+        "description": "Agent-initiated account creation. Sends a 6-digit OTP to the provided email. Idempotent \u2014 calling again re-sends the OTP. No authentication required.",
+        "operationId": "signup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many OTP requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account/verify": {
+      "post": {
+        "tags": [
+          "Signup"
+        ],
+        "summary": "Complete signup",
+        "description": "Complete account creation with the OTP code from email. Returns the account and a fresh API key. The key is shown once \u2014 store it. If the account already exists, a new API key is created.",
+        "operationId": "verify",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired OTP code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many verification attempts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Get account",
+        "description": "Account status and readiness. Check readiness.operational \u2014 if false, readiness.actions lists what's needed. readiness.next is the highest-priority action.",
+        "operationId": "get_account",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/api-keys": {
+      "get": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "List API keys",
+        "description": "List all API keys for the authenticated account. Returns key prefix only, never the full key.",
+        "operationId": "list_api_keys",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Create API key",
+        "description": "Create a new API key. The full key value is returned once in this response \u2014 store it securely. It will never be shown again.",
+        "operationId": "create_api_key",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/api-keys/{key_id}": {
+      "delete": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Delete API key",
+        "description": "Revoke an API key. Cannot delete the key you are currently authenticating with.",
+        "operationId": "delete_api_key",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API key not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot delete the key used for this request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/listings": {
+      "post": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "Create listing",
+        "description": "Create a listing to sell digital content. Returns checkout URL and readiness. If readiness.sellable is false, follow readiness.actions to resolve. readiness.next is the first action to take.",
+        "operationId": "create_listing",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateListingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Listing created and published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded. Retry after the `Retry-After` header value.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "List listings",
+        "description": "List all listings for the authenticated account. Each listing includes readiness status.",
+        "operationId": "list_listings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Pagination cursor from a previous response.",
+              "title": "Cursor"
+            },
+            "description": "Pagination cursor from a previous response."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum number of listings to return.",
+              "examples": [
+                20
+              ],
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum number of listings to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/listings/{slug}": {
+      "get": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "Get listing",
+        "description": "Get a single listing by slug. Check readiness.sellable \u2014 if false, readiness.actions tells you what's needed.",
+        "operationId": "get_listing",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Listing slug (URL slug).",
+              "examples": [
+                "seo-playbook"
+              ],
+              "title": "Slug"
+            },
+            "description": "Listing slug (URL slug)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Listing not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "Update listing",
+        "description": "Update listing fields (price, description, metadata, etc.). Content is immutable \u2014 delete and recreate to change content. Returns updated listing with readiness.",
+        "operationId": "update_listing",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Listing slug (URL slug).",
+              "examples": [
+                "seo-playbook"
+              ],
+              "title": "Slug"
+            },
+            "description": "Listing slug (URL slug)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateListingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Listing not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "Delete listing",
+        "description": "Delete a listing and its stored content. Irreversible.",
+        "operationId": "delete_listing",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Listing slug (URL slug).",
+              "examples": [
+                "seo-playbook"
+              ],
+              "title": "Slug"
+            },
+            "description": "Listing slug (URL slug)."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Listing not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orders": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "List orders",
+        "description": "List orders for the authenticated account. Filter by status. Paginated.",
+        "operationId": "list_orders",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/OrderStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter orders by status.",
+              "examples": [
+                "completed"
+              ],
+              "title": "Status"
+            },
+            "description": "Filter orders by status."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Pagination cursor from a previous response.",
+              "title": "Cursor"
+            },
+            "description": "Pagination cursor from a previous response."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum number of orders to return.",
+              "examples": [
+                20
+              ],
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum number of orders to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orders/{order_id}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Get order",
+        "description": "Get a single order by ID.",
+        "operationId": "get_order",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order ID.",
+              "examples": [
+                "ord_9xM4kP7nR2qT5wY1"
+              ],
+              "title": "Order Id"
+            },
+            "description": "Order ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account/stripe-key": {
+      "post": {
+        "tags": [
+          "Stripe"
+        ],
+        "summary": "Set Stripe secret key",
+        "description": "Set a Stripe secret key directly. For developers who already have Stripe. Validates the key format and checks charges are enabled. Returns updated account with readiness.",
+        "operationId": "set_stripe_key",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStripeKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid Stripe key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/account/stripe/connect": {
+      "post": {
+        "tags": [
+          "Stripe"
+        ],
+        "summary": "Start Stripe Connect onboarding",
+        "description": "Start guided Stripe onboarding. Returns a URL to redirect the human to. After the human completes onboarding, poll GET /account to check readiness.",
+        "operationId": "start_stripe_connect",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeConnectSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/account/stripe": {
+      "delete": {
+        "tags": [
+          "Stripe"
+        ],
+        "summary": "Disconnect Stripe",
+        "description": "Remove Stripe configuration from account. Returns updated account with readiness.",
+        "operationId": "disconnect_stripe",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/webhooks": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List webhooks",
+        "description": "List all webhook endpoints for the authenticated account.",
+        "operationId": "list_webhooks",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Create webhook",
+        "description": "Register a webhook endpoint. Returns the endpoint with its signing secret \u2014 store it, shown once.",
+        "operationId": "create_webhook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/webhooks/{webhook_id}": {
+      "put": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Update webhook",
+        "description": "Update a webhook endpoint. Only provided fields are changed.",
+        "operationId": "update_webhook",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Webhook endpoint ID.",
+              "examples": [
+                "wh_3mK8nP2qR5tW7xY1"
+              ],
+              "title": "Webhook Id"
+            },
+            "description": "Webhook endpoint ID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete webhook",
+        "description": "Delete a webhook endpoint. Irreversible.",
+        "operationId": "delete_webhook",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Webhook endpoint ID.",
+              "examples": [
+                "wh_3mK8nP2qR5tW7xY1"
+              ],
+              "title": "Webhook Id"
+            },
+            "description": "Webhook endpoint ID."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{webhook_id}/events": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List webhook delivery events",
+        "description": "List delivery event history for a webhook endpoint. Use to debug failed deliveries.",
+        "operationId": "list_webhook_events",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Webhook endpoint ID.",
+              "examples": [
+                "wh_3mK8nP2qR5tW7xY1"
+              ],
+              "title": "Webhook Id"
+            },
+            "description": "Webhook endpoint ID."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookEventListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{webhook_id}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Test webhook",
+        "description": "Send a test event to a webhook endpoint and return the delivery result. Does not persist an event record.",
+        "operationId": "test_webhook",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Webhook endpoint ID.",
+              "examples": [
+                "wh_3mK8nP2qR5tW7xY1"
+              ],
+              "title": "Webhook Id"
+            },
+            "description": "Webhook endpoint ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookTestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountReadiness": {
+        "properties": {
+          "operational": {
+            "type": "boolean",
+            "title": "Operational",
+            "description": "True when the account can sell. False means actions are needed."
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Actions",
+            "description": "What's needed to make this account operational. Empty when operational is true."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next",
+            "description": "Code of the highest-priority action."
+          }
+        },
+        "type": "object",
+        "required": [
+          "operational"
+        ],
+        "title": "AccountReadiness"
+      },
+      "AccountResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "account",
+            "title": "Object",
+            "description": "Object type identifier. Always `account`.",
+            "default": "account",
+            "examples": [
+              "account"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique identifier",
+            "examples": [
+              "acc_7kQ2xY9mN3pR5tW1"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "Account email address",
+            "examples": [
+              "seller@example.com"
+            ]
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan",
+            "description": "Current plan tier",
+            "examples": [
+              "free",
+              "growth",
+              "scale"
+            ]
+          },
+          "fee_rate": {
+            "type": "string",
+            "title": "Fee Rate",
+            "description": "Transaction fee rate as a decimal string (e.g. '0.10' = 10%)",
+            "examples": [
+              "0.10",
+              "0.05"
+            ]
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/AccountReadiness",
+            "description": "Account operational readiness. `operational` is true when the account can sell. If false, `actions` lists what's needed with kind (api/human), resolve details, and `next` points to the highest-priority action."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Time at which the account was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "plan",
+          "fee_rate",
+          "readiness",
+          "created_at"
+        ],
+        "title": "AccountResponse"
+      },
+      "Action": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ActionCode",
+            "description": "Machine-readable action identifier for automation branching.",
+            "examples": [
+              "set_stripe_key"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ActionKind",
+            "description": "Whether an agent can execute this directly (api) or needs human interaction (human).",
+            "examples": [
+              "api"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable explanation. AI agents relay this to users.",
+            "examples": [
+              "Set Stripe secret key to accept payments"
+            ]
+          },
+          "resolve": {
+            "$ref": "#/components/schemas/ActionResolve",
+            "description": "How to resolve this action."
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "kind",
+          "message",
+          "resolve"
+        ],
+        "title": "Action"
+      },
+      "ActionCode": {
+        "type": "string",
+        "enum": [
+          "set_stripe_key",
+          "connect_stripe",
+          "enable_charges",
+          "update_billing"
+        ],
+        "title": "ActionCode"
+      },
+      "ActionKind": {
+        "type": "string",
+        "enum": [
+          "api",
+          "human"
+        ],
+        "title": "ActionKind"
+      },
+      "ActionResolve": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "description": "How to resolve: HTTP method (POST, GET) for kind=api, 'redirect' for kind=human.",
+            "examples": [
+              "POST"
+            ]
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint",
+            "description": "API endpoint path for kind=api actions.",
+            "examples": [
+              "/v1/account/stripe-key"
+            ]
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Full URL for kind=human actions (browser redirect).",
+            "examples": [
+              "https://console.listbee.so/connect/stripe"
+            ]
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params",
+            "description": "Example request body for kind=api actions.",
+            "examples": [
+              {
+                "secret_key": "sk_live_..."
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "method"
+        ],
+        "title": "ActionResolve"
+      },
+      "ApiKeyListResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "list",
+            "title": "Object",
+            "description": "Object type identifier.",
+            "default": "list",
+            "examples": [
+              "list"
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "List of API keys"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "Always false \u2014 API keys are not paginated.",
+            "default": false
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor",
+            "description": "Always null \u2014 API keys are not paginated."
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ApiKeyListResponse"
+      },
+      "ApiKeyResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "api_key",
+            "title": "Object",
+            "description": "Object type identifier.",
+            "default": "api_key",
+            "examples": [
+              "api_key"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "API key entity ID",
+            "examples": [
+              "ak_7kQ2xY9mN3pR5tW1vB8a"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable label",
+            "examples": [
+              "n8n production"
+            ]
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix",
+            "description": "First 8 characters of the key value",
+            "examples": [
+              "lb_abc12"
+            ]
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key",
+            "description": "Full API key value. Only present on creation \u2014 shown once, never again.",
+            "examples": [
+              "lb_abc123def456ghi789"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the key was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "created_at"
+        ],
+        "title": "ApiKeyResponse"
+      },
+      "BlurMode": {
+        "type": "string",
+        "enum": [
+          "true",
+          "false",
+          "auto"
+        ],
+        "title": "BlurMode"
+      },
+      "ContentType": {
+        "type": "string",
+        "enum": [
+          "file",
+          "url",
+          "text"
+        ],
+        "title": "ContentType"
+      },
+      "CreateApiKeyRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable label for this API key.",
+            "examples": [
+              "n8n production",
+              "claude-code"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateApiKeyRequest"
+      },
+      "CreateListingRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Product name shown on the product page",
+            "examples": [
+              "SEO Playbook 2026",
+              "Premium Stock Picks"
+            ]
+          },
+          "price": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Price",
+            "description": "Price in smallest currency unit (e.g. 2900 = $29.00)",
+            "examples": [
+              500,
+              2900,
+              9900
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3,
+            "title": "Currency",
+            "description": "Three-letter ISO currency code. Automatically uppercased",
+            "examples": [
+              "USD",
+              "EUR",
+              "GBP"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "The digital content to sell. A file URL (PDF, ZIP) is fetched and stored on CDN. A webpage URL is stored as a redirect. Plain text is stored as-is. Type is auto-detected.",
+            "examples": [
+              "https://example.com/ebook.pdf",
+              "https://example.com/secret-members-area",
+              "Buy signal: AAPL calls 190 strike"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Longer product description, plain text",
+            "examples": [
+              "A comprehensive guide to modern SEO techniques."
+            ]
+          },
+          "tagline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline",
+            "description": "Short line below the name",
+            "examples": [
+              "Updated for 2026 algorithm changes"
+            ]
+          },
+          "highlights": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Highlights",
+            "description": "Bullet-point feature badges. Keeps first 10 if more are provided",
+            "examples": [
+              [
+                "50+ pages",
+                "Actionable tips",
+                "Free updates"
+              ]
+            ]
+          },
+          "cta": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cta",
+            "description": "Buy button text. Defaults to \"Buy Now\"",
+            "examples": [
+              "Get Instant Access",
+              "Download Now"
+            ]
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url",
+            "description": "Fetched and stored on CDN. If omitted, auto-generated from content type",
+            "examples": [
+              "https://example.com/cover.jpg"
+            ]
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Arbitrary key-value pairs forwarded in webhook events. Use for your own tracking",
+            "examples": [
+              {
+                "campaign": "launch-week",
+                "source": "n8n"
+              }
+            ]
+          },
+          "compare_at_price": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compare At Price",
+            "description": "Strikethrough price in smallest currency unit. Must be greater than `price`",
+            "examples": [
+              3900,
+              4900
+            ]
+          },
+          "badges": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Badges",
+            "description": "Short promotional badges. Keeps first 10 if more are provided",
+            "examples": [
+              [
+                "Limited time",
+                "Best seller"
+              ]
+            ]
+          },
+          "cover_blur": {
+            "$ref": "#/components/schemas/BlurMode",
+            "description": "`true` always blurs cover, `false` never blurs, `auto` blurs for image files",
+            "default": "auto",
+            "examples": [
+              "auto"
+            ]
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating",
+            "description": "Seller-provided aggregate star rating (1\u20135). Values outside this range are clamped automatically",
+            "examples": [
+              4.8,
+              4.5
+            ]
+          },
+          "rating_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Count",
+            "description": "Seller-provided review or purchase count, shown alongside the rating",
+            "examples": [
+              1243,
+              89
+            ]
+          },
+          "reviews": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReviewInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviews",
+            "description": "Featured review cards. Keeps first 10 if more are provided",
+            "examples": [
+              [
+                {
+                  "content": "Best decision I've made for my health.",
+                  "name": "Clara D.",
+                  "rating": 4.5
+                }
+              ]
+            ]
+          },
+          "faqs": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FaqItemInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faqs",
+            "description": "FAQ accordion items. Keeps first 10 if more are provided",
+            "examples": [
+              [
+                {
+                  "a": "Yes, completely beginner-friendly.",
+                  "q": "Is this for beginners?"
+                }
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "price",
+          "currency",
+          "content"
+        ],
+        "title": "CreateListingRequest",
+        "description": "All optional display fields (name, description, tagline, highlights, cta, badges, cover, reviews, faqs) appear on the product page buyers see."
+      },
+      "CreateWebhookRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "A name to help you identify this endpoint in the dashboard",
+            "examples": [
+              "Order notifications"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url",
+            "description": "The HTTPS URL that will receive POST requests for each event",
+            "examples": [
+              "https://example.com/webhooks/listbee"
+            ]
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookEventType"
+            },
+            "type": "array",
+            "title": "Events",
+            "description": "Event types to subscribe to. Empty list subscribes to all events",
+            "examples": [
+              [
+                "order.completed"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "url"
+        ],
+        "title": "CreateWebhookRequest"
+      },
+      "FaqItemInput": {
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Q",
+            "description": "Question text",
+            "examples": [
+              "Is this for beginners?"
+            ]
+          },
+          "a": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "A",
+            "description": "Answer text",
+            "examples": [
+              "Yes, completely beginner-friendly."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "q",
+          "a"
+        ],
+        "title": "FaqItemInput"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ListingListResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "list",
+            "title": "Object",
+            "description": "Object type identifier. Always `list`.",
+            "default": "list",
+            "examples": [
+              "list"
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ListingResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Array of listing objects."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor",
+            "description": "Pass as `cursor` query param to fetch the next page"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "`true` if more results exist beyond this page",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ListingListResponse"
+      },
+      "ListingReadiness": {
+        "properties": {
+          "sellable": {
+            "type": "boolean",
+            "title": "Sellable",
+            "description": "True when buyers can purchase. False means actions are needed."
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Actions",
+            "description": "What's needed to make this listing sellable. Empty when sellable is true."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next",
+            "description": "Code of the highest-priority action. Agents execute this first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sellable"
+        ],
+        "title": "ListingReadiness"
+      },
+      "ListingResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "listing",
+            "title": "Object",
+            "description": "Object type identifier. Always `listing`.",
+            "default": "listing",
+            "examples": [
+              "listing"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique identifier",
+            "examples": [
+              "lst_7kQ2xY9mN3pR5tW1vB8a"
+            ]
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "URL slug for the product page",
+            "examples": [
+              "seo-playbook"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Product name shown on the product page",
+            "examples": [
+              "SEO Playbook 2026"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Longer product description, plain text",
+            "examples": [
+              "A comprehensive guide to modern SEO."
+            ]
+          },
+          "tagline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline",
+            "description": "Short line below the name",
+            "examples": [
+              "Updated for 2026 algorithm changes"
+            ]
+          },
+          "highlights": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Highlights",
+            "description": "Bullet-point feature badges",
+            "examples": [
+              [
+                "50+ pages",
+                "Actionable tips"
+              ]
+            ]
+          },
+          "cta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cta",
+            "description": "Buy button text",
+            "examples": [
+              "Get Instant Access"
+            ]
+          },
+          "price": {
+            "type": "integer",
+            "title": "Price",
+            "description": "Price in smallest currency unit",
+            "examples": [
+              2900
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Three-letter ISO currency code, uppercase",
+            "examples": [
+              "USD"
+            ]
+          },
+          "content_type": {
+            "$ref": "#/components/schemas/ContentType",
+            "description": "Auto-detected from the `content` value at creation",
+            "examples": [
+              "file"
+            ]
+          },
+          "has_content": {
+            "type": "boolean",
+            "title": "Has Content",
+            "description": "`true` if content was successfully fetched and stored",
+            "examples": [
+              true
+            ]
+          },
+          "has_cover": {
+            "type": "boolean",
+            "title": "Has Cover",
+            "description": "`true` if a cover image exists (uploaded or generated)",
+            "examples": [
+              true
+            ]
+          },
+          "compare_at_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compare At Price",
+            "description": "Strikethrough price in smallest currency unit",
+            "examples": [
+              3900
+            ]
+          },
+          "badges": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Badges",
+            "description": "Short promotional badges",
+            "examples": [
+              [
+                "Limited time"
+              ]
+            ]
+          },
+          "cover_blur": {
+            "$ref": "#/components/schemas/BlurMode",
+            "description": "Cover image blur mode",
+            "default": "auto",
+            "examples": [
+              "auto"
+            ]
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating",
+            "description": "Seller-provided aggregate star rating",
+            "examples": [
+              4.8
+            ]
+          },
+          "rating_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Count",
+            "description": "Seller-provided review or purchase count",
+            "examples": [
+              1243
+            ]
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewInput"
+            },
+            "type": "array",
+            "title": "Reviews",
+            "description": "Featured review cards",
+            "examples": [
+              []
+            ]
+          },
+          "faqs": {
+            "items": {
+              "$ref": "#/components/schemas/FaqItemInput"
+            },
+            "type": "array",
+            "title": "Faqs",
+            "description": "FAQ accordion items",
+            "examples": [
+              []
+            ]
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Arbitrary key-value pairs set at creation",
+            "examples": [
+              {
+                "source": "n8n"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ListingStatus",
+            "description": "Current listing status",
+            "examples": [
+              "published"
+            ]
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Full product page URL \u2014 share this with buyers",
+            "examples": [
+              "https://buy.listbee.so/seo-playbook"
+            ]
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/ListingReadiness",
+            "description": "Monetization readiness. `sellable` is true when buyers can complete a purchase. If false, `actions` lists what's needed with kind (api/human), resolve details, and `next` points to the highest-priority action."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Time at which the listing was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "highlights",
+          "price",
+          "currency",
+          "content_type",
+          "has_content",
+          "has_cover",
+          "status",
+          "readiness",
+          "created_at"
+        ],
+        "title": "ListingResponse"
+      },
+      "ListingStatus": {
+        "type": "string",
+        "enum": [
+          "published"
+        ],
+        "title": "ListingStatus"
+      },
+      "OrderListResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "list",
+            "title": "Object",
+            "description": "Object type identifier. Always `list`.",
+            "default": "list",
+            "examples": [
+              "list"
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OrderResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Array of order objects."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor",
+            "description": "Pass as `cursor` query param to fetch the next page"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "`true` if more results exist beyond this page",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "OrderListResponse"
+      },
+      "OrderResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "order",
+            "title": "Object",
+            "description": "Object type identifier. Always `order`.",
+            "default": "order",
+            "examples": [
+              "order"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique identifier",
+            "examples": [
+              "ord_9xM4kP7nR2qT5wY1"
+            ]
+          },
+          "listing_id": {
+            "type": "string",
+            "title": "Listing Id",
+            "description": "ID of the purchased listing",
+            "examples": [
+              "lst_7kQ2xY9mN3pR5tW1vB8a"
+            ]
+          },
+          "buyer_email": {
+            "type": "string",
+            "title": "Buyer Email",
+            "description": "Buyer's email address from Stripe Checkout",
+            "examples": [
+              "buyer@example.com"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "title": "Amount",
+            "description": "Amount paid in smallest currency unit",
+            "examples": [
+              2900
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Three-letter ISO currency code, uppercase",
+            "examples": [
+              "USD"
+            ]
+          },
+          "stripe_session_id": {
+            "type": "string",
+            "title": "Stripe Session Id",
+            "description": "Stripe Checkout Session that created this order",
+            "examples": [
+              "cs_test_a1b2c3d4"
+            ]
+          },
+          "stripe_payment_intent_id": {
+            "type": "string",
+            "title": "Stripe Payment Intent Id",
+            "description": "Stripe PaymentIntent for this payment",
+            "examples": [
+              "pi_3abc123def456"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus",
+            "description": "Current order status",
+            "examples": [
+              "completed"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Time at which the order was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "listing_id",
+          "buyer_email",
+          "amount",
+          "currency",
+          "stripe_session_id",
+          "stripe_payment_intent_id",
+          "status",
+          "created_at"
+        ],
+        "title": "OrderResponse"
+      },
+      "OrderStatus": {
+        "type": "string",
+        "enum": [
+          "completed"
+        ],
+        "title": "OrderStatus"
+      },
+      "ProblemDetail": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "URI identifying the error type. Points to documentation.",
+            "examples": [
+              "https://docs.listbee.so/errors/invalid-request"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Short, stable, human-readable label for the error category.",
+            "examples": [
+              "Invalid Request"
+            ]
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status",
+            "description": "HTTP status code echoed in the body.",
+            "examples": [
+              422
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Specific explanation of what went wrong.",
+            "examples": [
+              "Price must be greater than 0"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Machine-readable error code for programmatic handling.",
+            "examples": [
+              "invalid_price"
+            ]
+          },
+          "param": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param",
+            "description": "The request field that caused the error, if applicable.",
+            "examples": [
+              "price"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "code"
+        ],
+        "title": "ProblemDetail",
+        "description": "RFC 9457 Problem Details for HTTP APIs."
+      },
+      "ReviewInput": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Name",
+            "description": "Reviewer display name",
+            "examples": [
+              "Clara D."
+            ]
+          },
+          "rating": {
+            "type": "number",
+            "title": "Rating",
+            "description": "Star rating (1\u20135). Values outside this range are clamped automatically",
+            "examples": [
+              4.5
+            ]
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Content",
+            "description": "Review body text",
+            "examples": [
+              "Excellent quality content."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "rating",
+          "content"
+        ],
+        "title": "ReviewInput"
+      },
+      "SetStripeKeyRequest": {
+        "properties": {
+          "secret_key": {
+            "type": "string",
+            "title": "Secret Key",
+            "description": "Stripe secret key (sk_live_... or sk_test_...).",
+            "examples": [
+              "sk_live_abc123..."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "secret_key"
+        ],
+        "title": "SetStripeKeyRequest"
+      },
+      "SignupRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "Email address for the new account. An OTP verification code will be sent.",
+            "examples": [
+              "seller@example.com"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "SignupRequest"
+      },
+      "SignupResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "signup_session",
+            "title": "Object",
+            "description": "Object type.",
+            "default": "signup_session",
+            "examples": [
+              "signup_session"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "Email the OTP was sent to.",
+            "examples": [
+              "seller@example.com"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "const": "otp_sent",
+            "title": "Status",
+            "description": "Always otp_sent on success.",
+            "default": "otp_sent",
+            "examples": [
+              "otp_sent"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable instruction.",
+            "default": "Check your email for a 6-digit verification code."
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "SignupResponse"
+      },
+      "StripeConnectSessionResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "stripe_connect_session",
+            "title": "Object",
+            "description": "Object type.",
+            "default": "stripe_connect_session",
+            "examples": [
+              "stripe_connect_session"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Stripe onboarding URL. Redirect the human here.",
+            "examples": [
+              "https://connect.stripe.com/setup/..."
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At",
+            "description": "When this URL expires."
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "title": "StripeConnectSessionResponse"
+      },
+      "UpdateListingRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Product name",
+            "examples": [
+              "SEO Playbook 2026"
+            ]
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price",
+            "description": "Price in smallest currency unit",
+            "examples": [
+              2900
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "ISO currency code",
+            "examples": [
+              "USD"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Product description"
+          },
+          "tagline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline",
+            "description": "Short line below the name"
+          },
+          "highlights": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Highlights",
+            "description": "Bullet-point features. Keeps first 10"
+          },
+          "cta": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cta",
+            "description": "Buy button text"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url",
+            "description": "Cover image URL, fetched and stored on CDN"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Arbitrary key-value pairs"
+          },
+          "compare_at_price": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compare At Price",
+            "description": "Strikethrough price"
+          },
+          "badges": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Badges",
+            "description": "Promotional badges. Keeps first 10"
+          },
+          "cover_blur": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BlurMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cover blur mode"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating",
+            "description": "Aggregate star rating (1-5)"
+          },
+          "rating_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Count",
+            "description": "Review/purchase count"
+          },
+          "reviews": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReviewInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviews",
+            "description": "Featured reviews. Keeps first 10"
+          },
+          "faqs": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FaqItemInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faqs",
+            "description": "FAQ items. Keeps first 10"
+          }
+        },
+        "type": "object",
+        "title": "UpdateListingRequest",
+        "description": "Partial update \u2014 only provided fields are changed. Content is immutable."
+      },
+      "UpdateWebhookRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name",
+            "examples": [
+              "Order notifications"
+            ]
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "HTTPS endpoint URL",
+            "examples": [
+              "https://example.com/webhooks/listbee"
+            ]
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WebhookEventType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events",
+            "description": "Replaces the current event subscriptions. Empty list subscribes to all events",
+            "examples": [
+              [
+                "order.completed"
+              ]
+            ]
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled",
+            "description": "Set to `false` to pause delivery without deleting the endpoint",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "title": "UpdateWebhookRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerifyRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "Email used in signup.",
+            "examples": [
+              "seller@example.com"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "6-digit OTP from email.",
+            "examples": [
+              "482901"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "code"
+        ],
+        "title": "VerifyRequest"
+      },
+      "VerifyResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "signup_result",
+            "title": "Object",
+            "description": "Object type.",
+            "default": "signup_result",
+            "examples": [
+              "signup_result"
+            ]
+          },
+          "account": {
+            "$ref": "#/components/schemas/AccountResponse",
+            "description": "The created or existing account with readiness."
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "description": "API key value. Shown once \u2014 store it securely.",
+            "examples": [
+              "lb_abc123..."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "account",
+          "api_key"
+        ],
+        "title": "VerifyResponse"
+      },
+      "WebhookEventListResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "list",
+            "title": "Object",
+            "description": "Object type identifier. Always `list`.",
+            "default": "list",
+            "examples": [
+              "list"
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookEventResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Array of webhook event objects."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor",
+            "description": "Pass as `cursor` query param to fetch the next page"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "`true` if more results exist beyond this page",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WebhookEventListResponse"
+      },
+      "WebhookEventResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "webhook_event",
+            "title": "Object",
+            "description": "Object type identifier. Always `webhook_event`.",
+            "default": "webhook_event",
+            "examples": [
+              "webhook_event"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique event ID",
+            "examples": [
+              "evt_7kQ2xY9mN3pR5tW1"
+            ]
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/WebhookEventType",
+            "description": "The event type that triggered this delivery",
+            "examples": [
+              "order.completed"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "delivered",
+              "failed"
+            ],
+            "title": "Status",
+            "description": "Computed status: `delivered` if delivered_at is set, `failed` if attempts >= max_retries, otherwise `pending`.",
+            "examples": [
+              "delivered"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts",
+            "description": "Number of delivery attempts made",
+            "examples": [
+              1
+            ]
+          },
+          "max_retries": {
+            "type": "integer",
+            "title": "Max Retries",
+            "description": "Maximum delivery attempts before marking as failed",
+            "examples": [
+              5
+            ]
+          },
+          "response_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Status",
+            "description": "HTTP status code from the last delivery attempt",
+            "examples": [
+              200
+            ]
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error",
+            "description": "Error message from the last failed attempt",
+            "examples": [
+              null
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Time at which the event was created"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At",
+            "description": "Time at which the event was successfully delivered"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "event_type",
+          "status",
+          "attempts",
+          "max_retries",
+          "created_at"
+        ],
+        "title": "WebhookEventResponse"
+      },
+      "WebhookEventType": {
+        "type": "string",
+        "enum": [
+          "order.completed",
+          "order.refunded",
+          "order.disputed",
+          "order.dispute_closed",
+          "listing.created"
+        ],
+        "title": "WebhookEventType"
+      },
+      "WebhookListResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "list",
+            "title": "Object",
+            "description": "Object type identifier. Always `list`.",
+            "default": "list",
+            "examples": [
+              "list"
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Array of webhook objects."
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WebhookListResponse"
+      },
+      "WebhookResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "webhook",
+            "title": "Object",
+            "description": "Object type identifier. Always `webhook`.",
+            "default": "webhook",
+            "examples": [
+              "webhook"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique identifier",
+            "examples": [
+              "wh_3mK8nP2qR5tW7xY1"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name",
+            "examples": [
+              "Order notifications"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Endpoint URL",
+            "examples": [
+              "https://example.com/webhooks/listbee"
+            ]
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret",
+            "description": "HMAC signing secret \u2014 use this to verify payload signatures",
+            "examples": [
+              "whsec_a1b2c3d4e5f6"
+            ]
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookEventType"
+            },
+            "type": "array",
+            "title": "Events",
+            "description": "Subscribed event types. Empty means all events",
+            "examples": [
+              [
+                "order.completed"
+              ]
+            ]
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "`false` when delivery is paused",
+            "examples": [
+              true
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Time at which the endpoint was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "url",
+          "secret",
+          "events",
+          "enabled",
+          "created_at"
+        ],
+        "title": "WebhookResponse"
+      },
+      "WebhookTestResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "webhook_test",
+            "title": "Object",
+            "description": "Object type identifier. Always `webhook_test`.",
+            "default": "webhook_test",
+            "examples": [
+              "webhook_test"
+            ]
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "`true` if the endpoint returned a 2xx status code",
+            "examples": [
+              true
+            ]
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code",
+            "description": "HTTP status code returned by the endpoint",
+            "examples": [
+              200
+            ]
+          },
+          "response_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Body",
+            "description": "Response body from the endpoint, truncated to 2000 characters",
+            "examples": [
+              "OK"
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if delivery failed entirely",
+            "examples": [
+              null
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "WebhookTestResponse"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "description": "API key with `lb_` prefix. Pass as: `Authorization: Bearer lb_...`",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Listings",
+      "description": "Create, list, get, and delete listings."
+    },
+    {
+      "name": "Orders",
+      "description": "View buyer orders and payment details."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Configure webhook endpoints for event notifications."
+    },
+    {
+      "name": "Account",
+      "description": "Check account setup status."
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+node_modules/
+.fern/
+.claude/
+CLAUDE.md

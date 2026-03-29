@@ -1,0 +1,105 @@
+instances:
+  - url: listbee-docs.docs.buildwithfern.com
+    custom-domain: docs.listbee.so
+
+title: ListBee
+logo:
+  light: ./docs/assets/logo-light.svg
+  dark: ./docs/assets/logo-dark.svg
+
+colors:
+  accent-primary: "#F59E0B"
+  background: "#FFFFFF"
+
+navbar-links:
+  - type: primary
+    text: Get API Key
+    url: https://console.listbee.so
+
+tabs:
+  documentation:
+    display-name: Documentation
+    icon: book-open
+  api:
+    display-name: API Reference
+    icon: code
+  changelog:
+    display-name: Changelog
+    icon: clock
+
+navigation:
+  - tab: documentation
+    layout:
+      - section: Getting Started
+        contents:
+          - page: Welcome
+            path: ./docs/pages/welcome.mdx
+          - page: Introduction
+            path: ./docs/pages/introduction.mdx
+          - page: Quickstart
+            path: ./docs/pages/quickstart.mdx
+
+      - section: Core Concepts
+        contents:
+          - page: Listings
+            path: ./docs/pages/listings.mdx
+          - page: Orders & Delivery
+            path: ./docs/pages/orders.mdx
+          - page: Readiness System
+            path: ./docs/pages/readiness.mdx
+          - page: Payments
+            path: ./docs/pages/payments.mdx
+          - page: Webhooks
+            path: ./docs/pages/webhooks.mdx
+          - page: Errors
+            path: ./docs/pages/errors.mdx
+
+      - section: Agent Integration
+        contents:
+          - page: Agent Onboarding Flow
+            path: ./docs/pages/agent-onboarding.mdx
+          - page: MCP Server
+            path: ./docs/pages/mcp.mdx
+          - page: Claude Code Skill
+            path: ./docs/pages/claude-code-skill.mdx
+          - page: Python SDK
+            path: ./docs/pages/python-sdk.mdx
+          - page: n8n Node
+            path: ./docs/pages/n8n.mdx
+
+      - section: Guides
+        contents:
+          - page: Authentication
+            path: ./docs/pages/authentication.mdx
+          - page: Idempotency
+            path: ./docs/pages/idempotency.mdx
+          - page: Rate Limits
+            path: ./docs/pages/rate-limits.mdx
+          - page: Content Types
+            path: ./docs/pages/content-types.mdx
+
+      - section: Examples
+        contents:
+          - page: Sell from Claude Code
+            path: ./docs/pages/example-claude-code.mdx
+          - page: Sell from n8n
+            path: ./docs/pages/example-n8n.mdx
+          - page: Build a Storefront API
+            path: ./docs/pages/example-storefront.mdx
+
+      - section: Resources
+        contents:
+          - page: FAQ
+            path: ./docs/pages/faq.mdx
+          - page: Community
+            path: ./docs/pages/community.mdx
+
+  - tab: api
+    slug: api-reference
+    layout:
+      - api: API Reference
+
+  - tab: changelog
+    slug: changelog
+    layout:
+      - changelog: ./docs/changelog

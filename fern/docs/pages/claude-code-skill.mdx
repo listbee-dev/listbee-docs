@@ -1,0 +1,228 @@
+---
+title: Claude Code skill
+description: Teach Claude Code when and how to use ListBee by adding a skill file to your project.
+---
+
+A Claude Code skill is a Markdown file that tells Claude Code what a tool does, when to use it, and how to call it. When you add a ListBee skill to your project, Claude Code can create listings, check orders, and manage your account — without you having to explain the API each time.
+
+---
+
+## What a skill does
+
+Claude Code reads skill files from `.claude/skills/` in your project root. When you ask Claude Code to do something that matches the skill's trigger conditions, it follows the instructions in the skill file — including which API to call, what parameters to use, and how to handle errors.
+
+Without a skill file, Claude Code might attempt to use a generic HTTP approach or ask you for guidance. With a skill file, it knows exactly what to do.
+
+---
+
+## Setup
+
+Create the skill directory and file:
+
+```bash
+mkdir -p .claude/skills/listbee
+touch .claude/skills/listbee/SKILL.md
+```
+
+Add your API key to the environment:
+
+```bash
+export LISTBEE_API_KEY=lb_...
+```
+
+Or add it to a `.env` file that your project loads:
+
+```bash
+LISTBEE_API_KEY=lb_...
+```
+
+---
+
+## Skill file content
+
+Create `.claude/skills/listbee/SKILL.md` with the following content:
+
+````markdown
+# ListBee
+
+Use the ListBee API to create and manage digital product listings.
+
+## When to use
+
+Use this skill when the user:
+- Asks to sell something, create a product, or monetize content
+- Wants to create a listing, set a price, or share a buy link
+- Asks about orders, buyers, or payment status
+- Wants to update or delete an existing listing
+
+## Auth
+
+All requests use:
+```
+Authorization: Bearer $LISTBEE_API_KEY
+```
+
+Get the key from `LISTBEE_API_KEY` in the environment.
+
+## Base URL
+
+`https://api.listbee.so`
+
+## Core operations
+
+### Create a listing
+
+```python
+import httpx, os
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": f"Bearer {os.environ['LISTBEE_API_KEY']}"},
+    json={
+        "name": "<product name>",
+        "price": <price in cents>,
+        "currency": "usd",
+        "content": "<URL or text payload>",
+    },
+)
+listing = resp.json()
+print(listing["url"])  # share this with buyers
+```
+
+### List listings
+
+```python
+resp = httpx.get(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": f"Bearer {os.environ['LISTBEE_API_KEY']}"},
+)
+listings = resp.json()["data"]
+```
+
+### Get a listing
+
+```python
+resp = httpx.get(
+    "https://api.listbee.so/v1/listings/{slug}",
+    headers={"Authorization": f"Bearer {os.environ['LISTBEE_API_KEY']}"},
+)
+listing = resp.json()
+```
+
+### Update a listing
+
+```python
+resp = httpx.put(
+    "https://api.listbee.so/v1/listings/{slug}",
+    headers={"Authorization": f"Bearer {os.environ['LISTBEE_API_KEY']}"},
+    json={"price": 2900},  # any fields to update
+)
+```
+
+### Delete a listing
+
+```python
+httpx.delete(
+    "https://api.listbee.so/v1/listings/{slug}",
+    headers={"Authorization": f"Bearer {os.environ['LISTBEE_API_KEY']}"},
+)
+```
+
+### List orders
+
+```python
+resp = httpx.get(
+    "https://api.listbee.so/v1/orders",
+    headers={"Authorization": f"Bearer {os.environ['LISTBEE_API_KEY']}"},
+)
+orders = resp.json()["data"]
+```
+
+## Readiness
+
+Every listing response includes `readiness`:
+- `readiness.sellable: true` → buyers can purchase now
+- `readiness.sellable: false` → check `readiness.actions` for what's blocking
+- `readiness.next` → code of the highest-priority action
+
+If `sellable` is false, surface `readiness.actions[0].message` to the user.
+
+## Errors
+
+Errors use RFC 9457 format:
+```json
+{ "type": "...", "title": "...", "status": 422, "detail": "...", "code": "...", "param": "..." }
+```
+
+Common status codes: 401 (invalid key), 404 (not found), 422 (validation error), 429 (rate limit).
+
+## Key facts
+
+- Price is always in cents: $19.00 = `1900`
+- Listings are looked up by `slug`, not `id`
+- `content` can be a URL (file delivered to buyer) or raw text
+- `listing.url` is the product page — share it with buyers
+- ID prefixes: `lst_` listing, `ord_` order, `acc_` account
+````
+
+---
+
+## How it triggers
+
+Claude Code loads skill files when a conversation starts. The skill is active for all tasks in that session.
+
+Example prompts that will trigger the ListBee skill:
+
+- "Create a listing for my ebook, $12, here's the PDF link"
+- "I want to sell my course notes"
+- "What orders have come in today?"
+- "Update the price on my Python guide to $25"
+- "Delete the old listing"
+
+Claude Code reads the skill, picks the right operation, and executes it — including running the Python code if needed.
+
+---
+
+## Shared skills
+
+If you work across multiple projects and want the skill available everywhere, place it in the workspace-level skills directory:
+
+```bash
+mkdir -p ~/.claude/skills/listbee
+# add SKILL.md there
+```
+
+Skills in `~/.claude/skills/` are loaded in all Claude Code sessions regardless of project.
+
+---
+
+## Copy for AI assistants
+
+```python
+# ListBee — Claude Code skill
+#
+# Skill file location: .claude/skills/listbee/SKILL.md
+# (or ~/.claude/skills/listbee/SKILL.md for global)
+#
+# Triggers when user asks to:
+#   - sell something / create a product / monetize content
+#   - create a listing / set a price / share a buy link
+#   - check orders / view buyers / check payment status
+#   - update or delete a listing
+#
+# Auth: LISTBEE_API_KEY env var → Authorization: Bearer lb_...
+#
+# Core endpoints:
+#   POST   /v1/listings           create listing
+#   GET    /v1/listings           list listings
+#   GET    /v1/listings/{slug}    get listing
+#   PUT    /v1/listings/{slug}    update listing
+#   DELETE /v1/listings/{slug}    delete listing
+#   GET    /v1/orders             list orders
+#   GET    /v1/orders/{id}        get order
+#
+# After creating: check listing.readiness.sellable
+# If false: surface listing.readiness.actions[0].message to user
+#
+# Docs: https://docs.listbee.so
+```

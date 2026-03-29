@@ -1,0 +1,174 @@
+---
+title: MCP server
+description: Connect ListBee to Claude Desktop, Cursor, or any MCP-compatible client in one command.
+---
+
+The ListBee MCP server exposes the ListBee API as tools any MCP-compatible AI client can call. Once configured, your AI assistant can create listings, check orders, and manage your account without leaving the conversation.
+
+---
+
+## Install
+
+```bash
+npx listbee-mcp
+```
+
+No global install required. `npx` fetches and runs the package on demand.
+
+---
+
+## Configure Claude Desktop
+
+Add the server to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "listbee": {
+      "command": "npx",
+      "args": ["listbee-mcp"],
+      "env": {
+        "LISTBEE_API_KEY": "lb_..."
+      }
+    }
+  }
+}
+```
+
+The config file is located at:
+
+| Platform | Path |
+|----------|------|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+
+Restart Claude Desktop after editing the config. The ListBee tools appear automatically in the tool selector.
+
+---
+
+## Configure Cursor
+
+Add to `.cursor/mcp.json` in your project root, or to the global `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "listbee": {
+      "command": "npx",
+      "args": ["listbee-mcp"],
+      "env": {
+        "LISTBEE_API_KEY": "lb_..."
+      }
+    }
+  }
+}
+```
+
+---
+
+## Available tools
+
+Each tool maps directly to a ListBee API endpoint.
+
+| Tool | Method | Endpoint | Description |
+|------|--------|----------|-------------|
+| `get_account` | GET | `/v1/account` | Fetch account details and readiness |
+| `create_listing` | POST | `/v1/listings` | Create a new listing |
+| `list_listings` | GET | `/v1/listings` | List all listings (cursor pagination) |
+| `get_listing` | GET | `/v1/listings/{slug}` | Get a listing by slug |
+| `update_listing` | PUT | `/v1/listings/{slug}` | Update listing fields |
+| `delete_listing` | DELETE | `/v1/listings/{slug}` | Delete a listing |
+| `list_orders` | GET | `/v1/orders` | List all orders |
+| `get_order` | GET | `/v1/orders/{id}` | Get an order by ID |
+
+---
+
+## Tool parameters
+
+### create_listing
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | Product name |
+| `price` | integer | Yes | Price in cents (e.g. `1900` = $19.00) |
+| `currency` | string | Yes | ISO 4217 currency code (e.g. `"usd"`) |
+| `content` | string | Yes | URL or text payload delivered to buyers |
+| `description` | string | No | Product description shown on checkout page |
+| `slug` | string | No | URL slug — auto-generated from name if omitted |
+
+### update_listing
+
+All fields are optional. Only the fields you provide are updated.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | New product name |
+| `price` | integer | New price in cents |
+| `currency` | string | New currency code |
+| `content` | string | New content URL or payload |
+| `description` | string | New description |
+
+### list_listings / list_orders
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cursor` | string | null | Pagination cursor from previous response |
+| `limit` | integer | 20 | Results per page (max 100) |
+
+---
+
+## Example conversation
+
+Once the MCP server is configured, you can ask Claude directly:
+
+> Create a listing called "SQL Performance Guide", price $29, currency USD, content at https://my-bucket.s3.amazonaws.com/sql-guide.pdf
+
+Claude will call `create_listing` and return:
+
+> Done. Your listing is live at: https://buy.listbee.so/sql-performance-guide
+
+---
+
+## Environment variable
+
+The server requires `LISTBEE_API_KEY` in its environment. You can also set it in your shell profile and omit the `env` block in the config:
+
+```bash
+export LISTBEE_API_KEY=lb_...
+```
+
+Get your API key at [console.listbee.so](https://console.listbee.so).
+
+---
+
+## Copy for AI assistants
+
+```python
+# ListBee MCP server
+#
+# Install: npx listbee-mcp
+#
+# Claude Desktop config (~/.../claude_desktop_config.json):
+#   {
+#     "mcpServers": {
+#       "listbee": {
+#         "command": "npx",
+#         "args": ["listbee-mcp"],
+#         "env": { "LISTBEE_API_KEY": "lb_..." }
+#       }
+#     }
+#   }
+#
+# Available tools:
+#   get_account       GET  /v1/account
+#   create_listing    POST /v1/listings         { name, price (cents), currency, content }
+#   list_listings     GET  /v1/listings         { cursor?, limit? }
+#   get_listing       GET  /v1/listings/{slug}
+#   update_listing    PUT  /v1/listings/{slug}  { name?, price?, currency?, content?, description? }
+#   delete_listing    DELETE /v1/listings/{slug}
+#   list_orders       GET  /v1/orders           { cursor?, limit? }
+#   get_order         GET  /v1/orders/{id}
+#
+# Auth: LISTBEE_API_KEY env var (Bearer lb_...)
+# Docs: https://docs.listbee.so
+```

@@ -1,0 +1,191 @@
+---
+title: Idempotency
+description: Safely retry POST requests without creating duplicates.
+---
+
+Send an `Idempotency-Key` header with any POST request. If you use the same key within 24 hours, ListBee returns the original cached response instead of executing the request again.
+
+```
+Idempotency-Key: <unique-string>
+```
+
+---
+
+## When to use it
+
+Use an idempotency key whenever you are not sure whether a request succeeded.
+
+**Common scenarios:**
+- Network timeout before you receive a response
+- Connection reset mid-request
+- Client crash after sending but before receiving
+- Retry logic that may fire even when the original succeeded
+
+Without an idempotency key, retrying a `POST /v1/listings` after a timeout creates a second listing. With one, the retry returns the original listing.
+
+---
+
+## Which endpoints support it
+
+All `POST` endpoints under `/v1/*` accept `Idempotency-Key`. This includes:
+
+- `POST /v1/account/signup`
+- `POST /v1/account/verify`
+- `POST /v1/account/stripe-key`
+- `POST /v1/account/stripe/connect`
+- `POST /v1/api-keys`
+- `POST /v1/listings`
+
+`GET`, `PUT`, and `DELETE` requests are inherently idempotent and do not use the header.
+
+---
+
+## How it works
+
+1. First request with key `abc-123` → request executes, response cached for 24 hours.
+2. Second request with same key `abc-123` and same body → cached response returned, no side effects.
+3. Request with key `abc-123` and a **different** body → `409 idempotency_conflict`.
+
+The key is scoped to your API key. Two different accounts can use the same idempotency key without conflict.
+
+---
+
+## Example
+
+Use a UUID as the idempotency key. Generate it once before the first attempt and reuse it on every retry.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+import uuid
+
+BASE = "https://api.listbee.so"
+API_KEY = "lb_..."
+
+# Generate key once — reuse on every retry
+idempotency_key = str(uuid.uuid4())
+
+payload = {
+    "name": "Python Async Patterns",
+    "price": 1900,
+    "currency": "usd",
+    "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+}
+
+# Retry up to 3 times with the same idempotency key
+for attempt in range(3):
+    try:
+        resp = httpx.post(
+            f"{BASE}/v1/listings",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Idempotency-Key": idempotency_key,
+            },
+            json=payload,
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        listing = resp.json()
+        print(listing["url"])  # https://buy.listbee.so/python-async-patterns
+        break
+    except (httpx.TimeoutException, httpx.NetworkError) as exc:
+        if attempt == 2:
+            raise
+        print(f"Attempt {attempt + 1} failed: {exc}. Retrying...")
+```
+
+```typescript title="TypeScript"
+import { randomUUID } from "crypto";
+
+const BASE = "https://api.listbee.so";
+const API_KEY = "lb_...";
+
+// Generate key once — reuse on every retry
+const idempotencyKey = randomUUID();
+
+const payload = {
+  name: "Python Async Patterns",
+  price: 1900,
+  currency: "usd",
+  content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+};
+
+// Retry up to 3 times with the same idempotency key
+for (let attempt = 0; attempt < 3; attempt++) {
+  try {
+    const resp = await fetch(`${BASE}/v1/listings`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail);
+    }
+
+    const listing = await resp.json();
+    console.log(listing.url); // https://buy.listbee.so/python-async-patterns
+    break;
+  } catch (err) {
+    if (attempt === 2) throw err;
+    console.log(`Attempt ${attempt + 1} failed. Retrying...`);
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+## Conflict response
+
+If you send the same key with a different request body, ListBee returns `409 Conflict`:
+
+```json
+{
+  "type": "https://docs.listbee.so/errors/idempotency-conflict",
+  "title": "Idempotency conflict",
+  "status": 409,
+  "detail": "An idempotency key was reused with a different request body.",
+  "code": "idempotency_conflict",
+  "param": null
+}
+```
+
+This protects against accidentally reusing a key for a different operation.
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — idempotency
+#
+# Header: Idempotency-Key: <unique-string>
+# Applies to: all POST /v1/* endpoints
+# Duration: 24 hours
+#
+# Behavior:
+#   Same key + same body  → cached response (no side effects)
+#   Same key + diff body  → 409 idempotency_conflict
+#   Different key         → new request executes normally
+#
+# Best practice: generate a UUID before the first attempt, reuse on every retry
+#   import uuid; key = str(uuid.uuid4())
+#
+# When to use: any time a timeout or network error means you don't know
+#   if the original request succeeded — listing creation, account signup, etc.
+#
+# Key is scoped to your API key — no cross-account conflicts
+#
+# Auth: Authorization: Bearer lb_...
+# Docs: https://docs.listbee.so/idempotency
+```
+</CodeBlock>

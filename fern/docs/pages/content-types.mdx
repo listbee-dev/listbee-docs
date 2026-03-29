@@ -1,0 +1,153 @@
+---
+title: Content types
+description: How ListBee detects and handles different content payloads.
+---
+
+The `content` field on a listing accepts a URL or plain text. ListBee automatically detects what kind of content it is and handles delivery accordingly.
+
+---
+
+## Detection logic
+
+When you set `content`, ListBee inspects the value:
+
+1. If the value is not a URL → **TEXT**
+2. If the value is a URL → ListBee sends a `HEAD` request to the URL
+3. Response `Content-Type` is a file MIME type (e.g. `application/pdf`, `application/zip`) → **FILE**
+4. Response `Content-Type` is `text/html` → **URL**
+
+The detected type is stored as `content_type` on the listing object: `"file"`, `"url"`, or `"text"`.
+
+---
+
+## FILE
+
+A URL that points to a downloadable file.
+
+**Examples:** PDF, ZIP, EPUB, MP3, dataset, software binary.
+
+**How delivery works:** ListBee fetches the file, stores it on a CDN, and generates a signed time-limited download URL. After a buyer purchases, they receive an email with the signed URL. The URL expires after 24 hours.
+
+```python
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "name": "Advanced Python Patterns",
+        "price": 2900,
+        "currency": "usd",
+        "content": "https://my-bucket.s3.amazonaws.com/advanced-python.pdf",
+        # ^ PDF URL — detected as FILE
+    },
+)
+listing = resp.json()
+print(listing["content_type"])  # file
+```
+
+---
+
+## URL
+
+A URL that points to a web page.
+
+**Examples:** Notion page, Google Doc, a gated article, a course login page.
+
+**How delivery works:** The URL is stored as a redirect target. After a buyer purchases, they receive an email with a link. When they click it, they are redirected to your URL. ListBee does not cache or store the page content.
+
+```python
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "name": "Private Research Notes",
+        "price": 1500,
+        "currency": "usd",
+        "content": "https://www.notion.so/your-page-id",
+        # ^ HTML URL — detected as URL
+    },
+)
+listing = resp.json()
+print(listing["content_type"])  # url
+```
+
+---
+
+## TEXT
+
+Plain text — no URL, or a URL-like string that doesn't resolve to a file or HTML page.
+
+**Examples:** A license key, an API key, a password, a short code snippet, a discount code.
+
+**How delivery works:** The text is stored as-is. After a buyer purchases, they receive an email with the text displayed inline.
+
+```python
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "name": "Premium API Access",
+        "price": 4900,
+        "currency": "usd",
+        "content": "LICENSE-KEY-ABCD-1234-EFGH-5678",
+        # ^ Not a URL — detected as TEXT
+    },
+)
+listing = resp.json()
+print(listing["content_type"])  # text
+```
+
+---
+
+## Content is immutable
+
+Once a listing is created with content, the `content` field cannot be updated. `PUT /v1/listings/{slug}` does not accept `content`.
+
+To change the content, delete the listing and recreate it.
+
+This prevents accidental content swaps on live listings that have already been purchased.
+
+---
+
+## Summary
+
+| Type | `content` value | After purchase |
+|------|----------------|----------------|
+| `file` | URL → file MIME type | Signed CDN download URL, expires 24h |
+| `url` | URL → HTML page | Redirect to your URL |
+| `text` | Non-URL string | Text shown inline in email |
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — content types
+#
+# The `content` field accepts a URL or plain text.
+# Detection is automatic:
+#
+#   content = "https://...pdf"  → HEAD request → file MIME type → content_type: "file"
+#     delivery: CDN-hosted, signed download URL (expires 24h)
+#
+#   content = "https://notion.so/..."  → HEAD request → text/html → content_type: "url"
+#     delivery: redirect to your URL after purchase
+#
+#   content = "LICENSE-KEY-ABCD"  → not a URL → content_type: "text"
+#     delivery: text shown inline in buyer email
+#
+# content_type is returned on the listing object: "file" | "url" | "text"
+#
+# IMPORTANT: content is immutable — cannot be updated via PUT /v1/listings/{slug}
+# To change content: DELETE the listing and recreate it
+#
+# Auth: Authorization: Bearer lb_...
+# Docs: https://docs.listbee.so/content-types
+```
+</CodeBlock>

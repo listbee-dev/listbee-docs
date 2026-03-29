@@ -1,0 +1,236 @@
+---
+title: "Example: n8n workflow"
+description: Create a listing, handle order webhooks, and send Slack notifications — all in n8n.
+---
+
+This example shows a complete n8n workflow: a trigger creates a listing, a webhook node receives order notifications, and a Slack node sends a message when an order completes.
+
+---
+
+## Workflow overview
+
+| Node | Type | Purpose |
+|------|------|---------|
+| Manual trigger | Manual Trigger | Start the workflow to create a listing |
+| Create listing | HTTP Request | `POST /v1/listings` |
+| Order webhook | Webhook | Receive `order.completed` events from ListBee |
+| Send Slack notification | Slack | Post to `#sales` when an order completes |
+
+---
+
+## Node 1: Create listing
+
+Use an **HTTP Request** node to call `POST /v1/listings`.
+
+**Configuration:**
+
+| Field | Value |
+|-------|-------|
+| Method | `POST` |
+| URL | `https://api.listbee.so/v1/listings` |
+| Authentication | Header Auth |
+| Header name | `Authorization` |
+| Header value | `Bearer lb_...` |
+| Body type | JSON |
+
+**Body:**
+
+```json
+{
+  "name": "Python Async Patterns",
+  "price": 1900,
+  "currency": "usd",
+  "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf"
+}
+```
+
+**Response fields used downstream:**
+- `{{ $json.url }}` — product page URL
+- `{{ $json.slug }}` — listing slug
+- `{{ $json.readiness.sellable }}` — whether buyers can purchase
+
+---
+
+## Node 2: Order webhook
+
+Add a **Webhook** node to receive order events from ListBee.
+
+**Configuration:**
+
+| Field | Value |
+|-------|-------|
+| HTTP method | `POST` |
+| Path | `/listbee-orders` (your choice) |
+| Response mode | Immediately |
+
+Copy the webhook URL from n8n (e.g. `https://your-n8n.example.com/webhook/listbee-orders`) and register it in ListBee:
+
+```http
+POST https://api.listbee.so/v1/webhooks
+Authorization: Bearer lb_...
+Content-Type: application/json
+
+{
+  "url": "https://your-n8n.example.com/webhook/listbee-orders",
+  "events": ["order.completed"]
+}
+```
+
+Incoming payload shape:
+
+```json
+{
+  "object": "event",
+  "id": "evt_...",
+  "type": "order.completed",
+  "data": {
+    "object": "order",
+    "id": "ord_...",
+    "listing_id": "lst_...",
+    "amount": 1900,
+    "currency": "usd",
+    "buyer_email": "buyer@example.com",
+    "created_at": "2026-03-29T10:00:00Z"
+  }
+}
+```
+
+---
+
+## Node 3: Slack notification
+
+Add a **Slack** node after the webhook node.
+
+**Configuration:**
+
+| Field | Value |
+|-------|-------|
+| Resource | Message |
+| Operation | Post |
+| Channel | `#sales` |
+| Text | `New order: {{ $json.data.buyer_email }} paid ${{ ($json.data.amount / 100).toFixed(2) }} for listing {{ $json.data.listing_id }}` |
+
+---
+
+## Importable workflow JSON
+
+Copy and import this into n8n via **File → Import from JSON**:
+
+```json
+{
+  "name": "ListBee — create listing + order notifications",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "2",
+      "name": "Create Listing",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.listbee.so/v1/listings",
+        "authentication": "headerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer lb_..." },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "Python Async Patterns" },
+            { "name": "price", "value": 1900 },
+            { "name": "currency", "value": "usd" },
+            { "name": "content", "value": "https://my-bucket.s3.amazonaws.com/python-async.pdf" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3",
+      "name": "Order Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [240, 500],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "listbee-orders",
+        "responseMode": "onReceived"
+      },
+      "webhookId": "listbee-orders"
+    },
+    {
+      "id": "4",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [460, 500],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales",
+        "text": "=New order: {{$json.data.buyer_email}} paid ${{($json.data.amount/100).toFixed(2)}} for {{$json.data.listing_id}}"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Create Listing", "type": "main", "index": 0 }]]
+    },
+    "Order Webhook": {
+      "main": [[{ "node": "Notify Slack", "type": "main", "index": 0 }]]
+    }
+  }
+}
+```
+
+---
+
+## Using the ListBee n8n community node
+
+If you prefer a purpose-built node over HTTP Request, install the ListBee community node:
+
+```bash
+# In your n8n instance settings → Community nodes → Install
+n8n-nodes-listbee
+```
+
+The community node provides credential management, typed fields, and auto-completion for all ListBee endpoints. See the [n8n node docs](/n8n) for setup instructions.
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — n8n integration
+#
+# Option A: HTTP Request node (no extra install)
+#   Method: POST
+#   URL: https://api.listbee.so/v1/listings
+#   Header: Authorization: Bearer lb_...
+#   Body: { name, price (cents), currency, content }
+#
+# Option B: Community node (recommended)
+#   Install: n8n-nodes-listbee
+#   Handles auth, typed fields, all endpoints
+#
+# Receiving orders in n8n:
+#   1. Add Webhook node → copy URL
+#   2. Register: POST /v1/webhooks { url, events: ["order.completed"] }
+#   3. Payload: { object: "event", type: "order.completed", data: { order object } }
+#
+# Order fields: id (ord_...), listing_id (lst_...), amount (cents), currency,
+#               buyer_email, created_at
+#
+# Auth: Authorization: Bearer lb_...
+# Docs: https://docs.listbee.so/n8n
+# Node: https://github.com/listbee-dev/n8n-nodes-listbee
+```
+</CodeBlock>

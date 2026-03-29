@@ -1,0 +1,272 @@
+---
+title: "Example: storefront script"
+description: Bulk-create listings from a JSON file and monitor incoming orders.
+---
+
+This script reads a catalog from a JSON file, creates listings in bulk, and then polls for new orders. It is a complete runnable script with argument parsing and error handling.
+
+---
+
+## Catalog file format
+
+Create a `catalog.json` file with your listings:
+
+```json
+[
+  {
+    "name": "Python Async Patterns",
+    "price": 1900,
+    "currency": "usd",
+    "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf"
+  },
+  {
+    "name": "FastAPI Production Guide",
+    "price": 2900,
+    "currency": "usd",
+    "content": "https://my-bucket.s3.amazonaws.com/fastapi-guide.pdf"
+  },
+  {
+    "name": "SQL for Data Scientists",
+    "price": 1500,
+    "currency": "usd",
+    "content": "https://my-bucket.s3.amazonaws.com/sql-datascience.pdf"
+  }
+]
+```
+
+---
+
+## Full script
+
+```python
+#!/usr/bin/env python3
+"""
+ListBee storefront script.
+
+Usage:
+  # Create listings from catalog file
+  python storefront.py create --catalog catalog.json
+
+  # Monitor orders (poll every 30 seconds)
+  python storefront.py orders --interval 30
+
+  # Both: create listings then watch for orders
+  python storefront.py create --catalog catalog.json --then-watch
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+import uuid
+from datetime import datetime, timezone
+
+import httpx
+
+BASE = "https://api.listbee.so"
+
+
+def get_client() -> tuple[httpx.Client, str]:
+    """Return (client, api_key). Reads LISTBEE_API_KEY from environment."""
+    api_key = os.environ.get("LISTBEE_API_KEY")
+    if not api_key:
+        print("Error: LISTBEE_API_KEY environment variable not set.", file=sys.stderr)
+        sys.exit(1)
+
+    client = httpx.Client(
+        base_url=BASE,
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout=30.0,
+    )
+    return client, api_key
+
+
+def create_listings(client: httpx.Client, catalog_path: str) -> list[dict]:
+    """Read catalog JSON and create all listings. Return created listing objects."""
+    with open(catalog_path) as f:
+        catalog = json.load(f)
+
+    print(f"Creating {len(catalog)} listings...")
+    created = []
+
+    for item in catalog:
+        idempotency_key = str(uuid.uuid4())
+
+        try:
+            resp = client.post(
+                "/v1/listings",
+                json=item,
+                headers={"Idempotency-Key": idempotency_key},
+            )
+            resp.raise_for_status()
+            listing = resp.json()
+            created.append(listing)
+            print(
+                f"  ✓ {listing['name']:<40} {listing['url']}"
+                f"  sellable={listing['readiness']['sellable']}"
+            )
+        except httpx.HTTPStatusError as exc:
+            error = exc.response.json()
+            print(
+                f"  ✗ {item.get('name', '?'):<40} "
+                f"error={error.get('code')} {error.get('detail')}",
+                file=sys.stderr,
+            )
+
+    print(f"\nCreated {len(created)} of {len(catalog)} listings.")
+    return created
+
+
+def poll_orders(client: httpx.Client, interval: int = 30) -> None:
+    """Poll GET /v1/orders and print new orders as they arrive."""
+    print(f"Watching for orders (polling every {interval}s)... Ctrl+C to stop.\n")
+
+    seen_ids: set[str] = set()
+    cursor: str | None = None
+
+    while True:
+        try:
+            params: dict = {"limit": 50}
+            if cursor:
+                params["cursor"] = cursor
+
+            resp = client.get("/v1/orders", params=params)
+            resp.raise_for_status()
+            result = resp.json()
+
+            for order in result["data"]:
+                if order["id"] not in seen_ids:
+                    seen_ids.add(order["id"])
+                    ts = datetime.fromisoformat(order["created_at"].replace("Z", "+00:00"))
+                    local_ts = ts.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+                    amount = order["amount"] / 100
+                    print(
+                        f"[{local_ts}] New order {order['id']}"
+                        f"  buyer={order['buyer_email']}"
+                        f"  amount=${amount:.2f} {order['currency'].upper()}"
+                        f"  listing={order['listing_id']}"
+                    )
+
+            # Update cursor for next page (if paginating)
+            if result.get("cursor"):
+                cursor = result["cursor"]
+
+        except httpx.HTTPStatusError as exc:
+            print(f"Error polling orders: {exc}", file=sys.stderr)
+        except KeyboardInterrupt:
+            print("\nStopped.")
+            break
+
+        time.sleep(interval)
+
+
+def cmd_create(args: argparse.Namespace) -> None:
+    client, _ = get_client()
+    listings = create_listings(client, args.catalog)
+
+    not_sellable = [l for l in listings if not l["readiness"]["sellable"]]
+    if not_sellable:
+        print(f"\n{len(not_sellable)} listing(s) not yet sellable:")
+        for l in not_sellable:
+            next_code = l["readiness"]["next"]
+            print(f"  {l['name']}: next action = {next_code}")
+
+    if args.then_watch:
+        print()
+        poll_orders(client, interval=30)
+
+
+def cmd_orders(args: argparse.Namespace) -> None:
+    client, _ = get_client()
+    poll_orders(client, interval=args.interval)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="ListBee storefront script")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    create_parser = subparsers.add_parser("create", help="Create listings from catalog JSON")
+    create_parser.add_argument("--catalog", required=True, help="Path to catalog.json")
+    create_parser.add_argument(
+        "--then-watch", action="store_true", help="Watch for orders after creating"
+    )
+    create_parser.set_defaults(func=cmd_create)
+
+    orders_parser = subparsers.add_parser("orders", help="Poll for new orders")
+    orders_parser.add_argument(
+        "--interval", type=int, default=30, help="Poll interval in seconds (default: 30)"
+    )
+    orders_parser.set_defaults(func=cmd_orders)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Running the script
+
+```bash
+# Install dependencies
+pip install httpx
+
+# Set your API key
+export LISTBEE_API_KEY=lb_...
+
+# Create listings
+python storefront.py create --catalog catalog.json
+
+# Watch for orders
+python storefront.py orders --interval 30
+
+# Create and then watch
+python storefront.py create --catalog catalog.json --then-watch
+```
+
+---
+
+## Sample output
+
+```
+Creating 3 listings...
+  ✓ Python Async Patterns           https://buy.listbee.so/python-async-patterns  sellable=True
+  ✓ FastAPI Production Guide        https://buy.listbee.so/fastapi-production-guide  sellable=True
+  ✓ SQL for Data Scientists         https://buy.listbee.so/sql-for-data-scientists  sellable=True
+
+Created 3 of 3 listings.
+
+Watching for orders (polling every 30s)... Ctrl+C to stop.
+
+[2026-03-29 10:15:03] New order ord_abc123  buyer=customer@example.com  amount=$19.00 USD  listing=lst_xyz789
+[2026-03-29 10:47:22] New order ord_def456  buyer=another@example.com   amount=$29.00 USD  listing=lst_uvw012
+```
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — bulk listing creation + order polling
+#
+# Create listings from JSON array:
+#   POST /v1/listings  { name, price (cents), currency, content }
+#   Use Idempotency-Key header per request (uuid4)
+#   Response: { id, slug, url, readiness: { sellable, actions, next } }
+#
+# Poll for orders:
+#   GET /v1/orders?limit=50&cursor=...
+#   Response: { object: "list", data: [...], has_more: bool, cursor: str | null }
+#   Order fields: id (ord_...), listing_id (lst_...), buyer_email,
+#                 amount (cents), currency, created_at
+#
+# Pagination: pass cursor from response as cursor param on next request
+# Auth: Authorization: Bearer lb_...
+# Docs: https://docs.listbee.so
+```
+</CodeBlock>

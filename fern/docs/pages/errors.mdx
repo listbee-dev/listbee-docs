@@ -1,0 +1,165 @@
+---
+title: Errors
+description: ListBee uses RFC 9457 Problem Details for all error responses.
+---
+
+All error responses use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) with `Content-Type: application/problem+json`. Every error has the same shape — parse once, handle everywhere.
+
+---
+
+## Error format
+
+```json
+{
+  "type": "https://docs.listbee.so/errors/validation-error",
+  "title": "Validation error",
+  "status": 422,
+  "detail": "The price field must be a positive integer.",
+  "code": "invalid_field",
+  "param": "price"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | URI identifying the error type. Use this for programmatic matching. |
+| `title` | string | Short human-readable summary of the error type. |
+| `status` | integer | HTTP status code. Matches the response status. |
+| `detail` | string | Specific description of what went wrong in this request. |
+| `code` | string | Machine-readable error code. Use this to branch error handling logic. |
+| `param` | string \| null | The field that caused the error, if applicable. `null` for non-field errors. |
+
+---
+
+## HTTP status codes
+
+| Status | Name | When it occurs |
+|--------|------|---------------|
+| `400` | Bad request | The request body is malformed or missing required fields. |
+| `401` | Unauthorized | No API key provided, or the key is invalid or revoked. |
+| `404` | Not found | The resource does not exist, or you do not have access to it. |
+| `409` | Conflict | The request conflicts with existing state (e.g. duplicate idempotency key with different body). |
+| `422` | Unprocessable entity | The request is well-formed but fails validation (e.g. negative price, unsupported currency). |
+| `429` | Too many requests | Rate limit exceeded. See the `Retry-After` header for when to retry. |
+| `500` | Internal server error | Something went wrong on ListBee's side. Retrying with backoff is appropriate. |
+
+---
+
+## Common error codes
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `authentication_required` | 401 | No API key in the `Authorization` header. |
+| `invalid_api_key` | 401 | The API key is malformed, expired, or revoked. |
+| `not_found` | 404 | The requested resource does not exist. |
+| `invalid_field` | 422 | A field failed validation. Check `param` for which field. |
+| `missing_field` | 422 | A required field was not provided. Check `param`. |
+| `unsupported_currency` | 422 | The currency code is not supported. |
+| `price_too_low` | 422 | The price is below the minimum allowed amount. |
+| `stripe_not_connected` | 422 | No Stripe account connected. The listing cannot sell. |
+| `content_fetch_failed` | 422 | ListBee could not fetch the content URL you provided. |
+| `idempotency_conflict` | 409 | Same `Idempotency-Key` was used with a different request body. |
+| `rate_limit_exceeded` | 429 | Too many requests. Respect the `Retry-After` header. |
+| `internal_error` | 500 | Unexpected server error. Safe to retry with exponential backoff. |
+
+---
+
+## Handling errors in code
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={"name": "My Guide", "price": -100, "currency": "usd"},
+)
+
+if not resp.is_success:
+    error = resp.json()
+    code = error.get("code")
+    param = error.get("param")
+
+    if code == "invalid_field":
+        print(f"Validation error on field '{param}': {error['detail']}")
+    elif code == "authentication_required":
+        print("Check your API key.")
+    elif resp.status_code == 429:
+        retry_after = resp.headers.get("Retry-After", "60")
+        print(f"Rate limited. Retry after {retry_after} seconds.")
+    else:
+        print(f"Error {resp.status_code}: {error['detail']}")
+```
+
+```typescript title="TypeScript"
+const resp = await fetch("https://api.listbee.so/v1/listings", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer lb_...",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ name: "My Guide", price: -100, currency: "usd" }),
+});
+
+if (!resp.ok) {
+  const error = await resp.json();
+  const { code, param, detail } = error;
+
+  if (code === "invalid_field") {
+    console.error(`Validation error on field '${param}': ${detail}`);
+  } else if (code === "authentication_required") {
+    console.error("Check your API key.");
+  } else if (resp.status === 429) {
+    const retryAfter = resp.headers.get("Retry-After") ?? "60";
+    console.error(`Rate limited. Retry after ${retryAfter} seconds.`);
+  } else {
+    console.error(`Error ${resp.status}: ${detail}`);
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — error format (RFC 9457 Problem Details)
+#
+# Content-Type: application/problem+json
+# Shape: { type, title, status, detail, code, param }
+#
+# Always branch on `code` (machine-readable), not `title` (human-readable).
+# `param` identifies the offending field for validation errors; null otherwise.
+#
+# Common codes:
+#   authentication_required  401  No or invalid API key
+#   invalid_api_key          401  API key malformed, expired, or revoked
+#   not_found                404  Resource does not exist
+#   invalid_field            422  Field failed validation — check param
+#   missing_field            422  Required field absent — check param
+#   unsupported_currency     422  Currency code not supported
+#   price_too_low            422  Price below minimum
+#   stripe_not_connected     422  No Stripe connected, listing can't sell
+#   content_fetch_failed     422  Could not fetch the content URL
+#   idempotency_conflict     409  Same Idempotency-Key, different body
+#   rate_limit_exceeded      429  Too many requests — respect Retry-After header
+#   internal_error           500  Server error — safe to retry with backoff
+#
+# HTTP status summary:
+#   400 malformed request
+#   401 auth failure
+#   404 not found
+#   409 conflict
+#   422 validation failure
+#   429 rate limited (check Retry-After header)
+#   500 server error (retry safe)
+#
+# Auth: Authorization: Bearer lb_...
+# Docs: https://docs.listbee.so/errors
+```
+</CodeBlock>

@@ -1,0 +1,229 @@
+---
+title: Listings
+description: Create and manage priced digital content with hosted product pages.
+---
+
+A listing is a priced digital product with a hosted product page. Create one with a name, price, and content — ListBee generates a URL you can share directly with buyers.
+
+Each listing has a `readiness.sellable` flag. When `true`, buyers can purchase immediately. When `false`, `readiness.actions` tells you exactly what to fix. See the [Readiness system](/readiness) for full details.
+
+---
+
+## Create a listing
+
+`POST /v1/listings` requires `name`, `price` (in cents), `currency`, and `content`. The `content` field accepts a URL pointing to a file, a redirect URL, or a plain-text string — ListBee detects the type automatically.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "name": "Python Async Patterns",
+        "price": 1900,      # $19.00 in cents
+        "currency": "usd",
+        "content": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+    },
+)
+listing = resp.json()
+
+print(listing["url"])                    # https://buy.listbee.so/python-async-patterns
+print(listing["slug"])                   # python-async-patterns
+print(listing["readiness"]["sellable"])  # True — buyers can purchase now
+```
+
+```typescript title="TypeScript"
+const resp = await fetch("https://api.listbee.so/v1/listings", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer lb_...",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    name: "Python Async Patterns",
+    price: 1900,     // $19.00 in cents
+    currency: "usd",
+    content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+  }),
+});
+const listing = await resp.json();
+
+console.log(listing.url);                   // https://buy.listbee.so/python-async-patterns
+console.log(listing.slug);                  // python-async-patterns
+console.log(listing.readiness.sellable);    // true — buyers can purchase now
+```
+
+</CodeGroup>
+
+The response is a listing object. The `url` field is the product page — ready to share.
+
+---
+
+## Content types
+
+ListBee detects content type from what you pass to the `content` field:
+
+| Type | What you provide | What happens |
+|------|-----------------|--------------|
+| `FILE` | A URL ending in a file extension (`.pdf`, `.zip`, etc.) | File fetched and hosted on ListBee's CDN. Buyers receive a time-limited signed URL. |
+| `URL` | Any other URL | After payment, buyers are redirected to the URL. |
+| `TEXT` | A plain string (no `http://` prefix) | Inline content delivered directly in the order confirmation. |
+
+Auto-detection handles most cases. See [Content types](/content-types) for edge cases and explicit type overrides.
+
+---
+
+## Update a listing
+
+`PUT /v1/listings/{slug}` accepts any subset of fields. Only the fields you send are changed.
+
+Content is immutable after creation — to change what buyers receive, delete the listing and create a new one.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.put(
+    "https://api.listbee.so/v1/listings/python-async-patterns",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "price": 2500,   # raise price to $25.00
+        "tagline": "Production-ready async patterns for Python 3.10+",
+    },
+)
+listing = resp.json()
+print(listing["price"])    # 2500
+```
+
+```typescript title="TypeScript"
+const resp = await fetch(
+  "https://api.listbee.so/v1/listings/python-async-patterns",
+  {
+    method: "PUT",
+    headers: {
+      "Authorization": "Bearer lb_...",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      price: 2500,   // raise price to $25.00
+      tagline: "Production-ready async patterns for Python 3.10+",
+    }),
+  }
+);
+const listing = await resp.json();
+console.log(listing.price);    // 2500
+```
+
+</CodeGroup>
+
+---
+
+## Delete a listing
+
+`DELETE /v1/listings/{slug}` removes the listing and its product page. If the content type was `FILE`, the file is also removed from the CDN.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.delete(
+    "https://api.listbee.so/v1/listings/python-async-patterns",
+    headers={"Authorization": "Bearer lb_..."},
+)
+# 204 No Content on success
+```
+
+```typescript title="TypeScript"
+const resp = await fetch(
+  "https://api.listbee.so/v1/listings/python-async-patterns",
+  {
+    method: "DELETE",
+    headers: { "Authorization": "Bearer lb_..." },
+  }
+);
+// 204 No Content on success
+```
+
+</CodeGroup>
+
+---
+
+## Key fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Listing title shown on the product page. |
+| `price` | integer | Price in smallest currency unit (cents for USD). |
+| `currency` | string | ISO 4217 code, lowercase (`usd`, `eur`, `gbp`). |
+| `description` | string | Full description. Markdown supported. |
+| `tagline` | string | Short one-line pitch shown under the title. |
+| `highlights` | string[] | Bullet points displayed prominently on the page. |
+| `cta` | string | Buy button label. Defaults to `"Buy now"`. |
+| `cover_url` | string | URL of the cover image shown on the product page. |
+| `metadata` | object | Key-value store for your own data. Up to 50 keys. |
+| `badges` | string[] | Small labels displayed on the listing (e.g. `"New"`, `"Bestseller"`). |
+| `rating` | number | Display rating (0–5). Does not affect functionality. |
+| `reviews` | integer | Display review count. Does not affect functionality. |
+| `faqs` | object[] | FAQ items with `question` and `answer` fields. |
+
+---
+
+## Slug-based lookup
+
+Listings are fetched by slug, not ID. The slug is derived from the listing name at creation time and cannot be changed. Use it in all endpoints:
+
+```
+GET  /v1/listings/{slug}
+PUT  /v1/listings/{slug}
+DELETE /v1/listings/{slug}
+```
+
+If you need the slug after creation, it's in the `slug` field of the listing object.
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — listings API
+#
+# A listing = priced digital content + hosted product page.
+# All prices are in smallest currency unit (cents for USD).
+# Listings are looked up by slug, not ID.
+#
+# Create:
+#   POST /v1/listings
+#   Body: { "name": str, "price": int, "currency": str, "content": str }
+#   → 201 listing object with:
+#       id:        "lst_..."
+#       slug:      "python-async-patterns"
+#       url:       "https://buy.listbee.so/python-async-patterns"
+#       readiness: { "sellable": bool, "actions": [...], "next": str | null }
+#
+# Content type auto-detection:
+#   URL ending in .pdf/.zip/etc  → FILE  (fetched to CDN, signed URL delivery)
+#   Any other URL                → URL   (redirect after payment)
+#   Plain string (no http://)    → TEXT  (inline delivery)
+#
+# Update (partial, content immutable):
+#   PUT /v1/listings/{slug}  { any subset of fields }
+#
+# Delete (removes CDN file if FILE type):
+#   DELETE /v1/listings/{slug}  → 204
+#
+# Get:
+#   GET /v1/listings/{slug}
+#
+# List:
+#   GET /v1/listings?limit=20&cursor=...
+#
+# Auth: Authorization: Bearer lb_...
+# Errors: RFC 9457 { type, title, status, detail, code, param }
+```
+</CodeBlock>

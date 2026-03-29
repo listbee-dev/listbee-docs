@@ -1,0 +1,203 @@
+---
+title: Orders & Delivery
+description: How checkout works, the order lifecycle, and how buyers receive content.
+---
+
+An order is created when a buyer visits a product page and completes payment. ListBee handles the full flow — Stripe Checkout, payment confirmation, and content delivery — without any additional code on your side.
+
+---
+
+## How checkout works
+
+1. A buyer visits the product page URL (e.g. `https://buy.listbee.so/python-async-patterns`).
+2. They click the buy button, which opens a Stripe Checkout session.
+3. They complete payment on Stripe's hosted page.
+4. ListBee receives the payment confirmation webhook from Stripe.
+5. An access grant is created and the buyer receives their content by email.
+
+No redirect handling, no webhook setup, no email templates. It's all built in.
+
+---
+
+## Order lifecycle
+
+Orders move through three states:
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Stripe Checkout session created. Buyer has not yet paid. |
+| `paid` | Payment confirmed. Access grant created. Content delivered. |
+| `expired` | Checkout session expired without payment (after 24 hours). |
+
+A `paid` order is terminal — it will not change state. An `expired` order means the buyer abandoned checkout; they would need to revisit the product page to try again.
+
+---
+
+## Access grants
+
+After payment, ListBee creates an access grant (`ag_...`) linked to the order. The grant controls how the buyer receives content:
+
+| Content type | Delivery mechanism |
+|-------------|-------------------|
+| `FILE` | Time-limited signed URL sent by email. Valid for 48 hours. Buyers can re-request from the order confirmation page. |
+| `URL` | Buyer is redirected immediately after payment. |
+| `TEXT` | Inline content shown on the order confirmation page and sent by email. |
+
+Access grants are not exposed in the API response — they're an internal mechanism. From the API's perspective, a `paid` order means content has been delivered.
+
+---
+
+## List orders
+
+`GET /v1/orders` returns orders in reverse chronological order. Use cursor-based pagination to page through results.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.get(
+    "https://api.listbee.so/v1/orders",
+    headers={"Authorization": "Bearer lb_..."},
+    params={"limit": 20},
+)
+result = resp.json()
+
+for order in result["data"]:
+    print(order["id"], order["status"], order["amount"])
+
+# Paginate
+if result["has_more"]:
+    next_resp = httpx.get(
+        "https://api.listbee.so/v1/orders",
+        headers={"Authorization": "Bearer lb_..."},
+        params={"limit": 20, "cursor": result["cursor"]},
+    )
+```
+
+```typescript title="TypeScript"
+const resp = await fetch(
+  "https://api.listbee.so/v1/orders?limit=20",
+  { headers: { "Authorization": "Bearer lb_..." } }
+);
+const result = await resp.json();
+
+for (const order of result.data) {
+  console.log(order.id, order.status, order.amount);
+}
+
+// Paginate
+if (result.has_more) {
+  const nextResp = await fetch(
+    `https://api.listbee.so/v1/orders?limit=20&cursor=${result.cursor}`,
+    { headers: { "Authorization": "Bearer lb_..." } }
+  );
+}
+```
+
+</CodeGroup>
+
+The list response follows the standard list shape:
+
+```json
+{
+  "object": "list",
+  "data": [...],
+  "has_more": true,
+  "cursor": "ord_..."
+}
+```
+
+---
+
+## Get an order
+
+`GET /v1/orders/{id}` returns a single order by its `ord_...` ID.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.get(
+    "https://api.listbee.so/v1/orders/ord_...",
+    headers={"Authorization": "Bearer lb_..."},
+)
+order = resp.json()
+
+print(order["id"])            # ord_...
+print(order["status"])        # paid
+print(order["amount"])        # 1900 (cents)
+print(order["currency"])      # usd
+print(order["listing_id"])    # lst_...
+print(order["listing_slug"])  # python-async-patterns
+print(order["buyer_email"])   # buyer@example.com
+print(order["created_at"])    # ISO 8601 timestamp
+```
+
+```typescript title="TypeScript"
+const resp = await fetch(
+  "https://api.listbee.so/v1/orders/ord_...",
+  { headers: { "Authorization": "Bearer lb_..." } }
+);
+const order = await resp.json();
+
+console.log(order.id);            // ord_...
+console.log(order.status);        // paid
+console.log(order.amount);        // 1900 (cents)
+console.log(order.currency);      // usd
+console.log(order.listing_id);    // lst_...
+console.log(order.listing_slug);  // python-async-patterns
+console.log(order.buyer_email);   // buyer@example.com
+console.log(order.created_at);    // ISO 8601 timestamp
+```
+
+</CodeGroup>
+
+---
+
+## Filter orders
+
+Use query parameters to filter the list:
+
+| Parameter | Description |
+|-----------|-------------|
+| `listing_slug` | Only return orders for a specific listing. |
+| `status` | Filter by status: `pending`, `paid`, or `expired`. |
+| `limit` | Number of results per page. Max 100. Default 20. |
+| `cursor` | Pagination cursor from previous response. |
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — orders API
+#
+# Orders are created automatically when a buyer completes Stripe Checkout.
+# No code needed to trigger delivery — ListBee handles it on payment confirmation.
+#
+# Order lifecycle:
+#   pending  → buyer opened Stripe Checkout, not yet paid
+#   paid     → payment confirmed, content delivered (terminal)
+#   expired  → checkout expired without payment (terminal)
+#
+# Delivery by content type:
+#   FILE → signed URL emailed to buyer (valid 48h)
+#   URL  → redirect after payment
+#   TEXT → shown on confirmation page + emailed
+#
+# List orders (cursor pagination):
+#   GET /v1/orders?limit=20&cursor=ord_...&status=paid&listing_slug=my-listing
+#   → { "object": "list", "data": [...], "has_more": bool, "cursor": str | null }
+#
+# Get order:
+#   GET /v1/orders/{id}      (id = ord_...)
+#   → { "object": "order", "id", "status", "amount", "currency",
+#       "listing_id", "listing_slug", "buyer_email", "created_at" }
+#
+# Auth: Authorization: Bearer lb_...
+# Errors: RFC 9457 { type, title, status, detail, code, param }
+```
+</CodeBlock>

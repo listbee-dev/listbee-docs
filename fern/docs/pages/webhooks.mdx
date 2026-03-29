@@ -1,0 +1,260 @@
+---
+title: Webhooks
+description: Get notified when orders complete or listings change.
+---
+
+Webhooks let you receive event notifications over HTTP. When an event occurs — a buyer pays, a listing is created — ListBee sends a signed POST request to your endpoint.
+
+---
+
+## Register a webhook
+
+`POST /v1/webhooks` takes a URL and a list of event types to subscribe to.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/webhooks",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "url": "https://yourapp.com/webhooks/listbee",
+        "events": ["order.paid", "listing.created"],
+    },
+)
+webhook = resp.json()
+
+print(webhook["id"])      # wh_...
+print(webhook["secret"])  # whsec_... — store this, it's shown once
+```
+
+```typescript title="TypeScript"
+const resp = await fetch("https://api.listbee.so/v1/webhooks", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer lb_...",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    url: "https://yourapp.com/webhooks/listbee",
+    events: ["order.paid", "listing.created"],
+  }),
+});
+const webhook = await resp.json();
+
+console.log(webhook.id);      // wh_...
+console.log(webhook.secret);  // whsec_... — store this, it's shown once
+```
+
+</CodeGroup>
+
+The `secret` field is returned only at creation time. Store it — you'll need it to verify incoming requests.
+
+---
+
+## Events
+
+| Event | When it fires |
+|-------|--------------|
+| `order.created` | A buyer opens Stripe Checkout (order is `pending`). |
+| `order.paid` | Payment confirmed. Content delivered to buyer. |
+| `listing.created` | A new listing is created. |
+| `listing.updated` | Any field on a listing changes. |
+| `listing.deleted` | A listing is deleted. |
+
+Subscribe to the events you care about. You can subscribe to multiple events per webhook endpoint.
+
+---
+
+## Payload structure
+
+Every webhook request has the same envelope:
+
+```json
+{
+  "id": "evt_...",
+  "object": "event",
+  "type": "order.paid",
+  "created_at": "2025-03-15T10:30:00Z",
+  "data": {
+    "object": { ... }
+  }
+}
+```
+
+`data.object` contains the full resource that triggered the event — a listing object for listing events, an order object for order events.
+
+---
+
+## Signature verification
+
+Every webhook request includes a `X-ListBee-Signature` header. Verify it before processing the payload.
+
+The signature is an HMAC-SHA256 hex digest of the raw request body, signed with your webhook secret.
+
+<CodeGroup>
+
+```python title="Python"
+import hashlib
+import hmac
+from fastapi import Request, HTTPException
+
+WEBHOOK_SECRET = "whsec_..."  # from webhook creation
+
+async def handle_webhook(request: Request):
+    payload = await request.body()
+    signature = request.headers.get("X-ListBee-Signature")
+
+    expected = hmac.new(
+        WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, signature):
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    event = await request.json()
+    event_type = event["type"]
+
+    if event_type == "order.paid":
+        order = event["data"]["object"]
+        print(f"Order paid: {order['id']} — {order['buyer_email']}")
+
+    return {"ok": True}
+```
+
+```typescript title="TypeScript"
+import { createHmac, timingSafeEqual } from "crypto";
+import type { Request, Response } from "express";
+
+const WEBHOOK_SECRET = "whsec_..."; // from webhook creation
+
+export function handleWebhook(req: Request, res: Response) {
+  const payload = req.body as Buffer; // ensure raw body
+  const signature = req.headers["x-listbee-signature"] as string;
+
+  const expected = createHmac("sha256", WEBHOOK_SECRET)
+    .update(payload)
+    .digest("hex");
+
+  const sigBuffer = Buffer.from(signature, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+
+  if (
+    sigBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(sigBuffer, expectedBuffer)
+  ) {
+    return res.status(400).json({ error: "Invalid signature" });
+  }
+
+  const event = JSON.parse(payload.toString());
+
+  if (event.type === "order.paid") {
+    const order = event.data.object;
+    console.log(`Order paid: ${order.id} — ${order.buyer_email}`);
+  }
+
+  res.json({ ok: true });
+}
+```
+
+</CodeGroup>
+
+Always use a constant-time comparison function (`hmac.compare_digest` in Python, `timingSafeEqual` in Node.js) to prevent timing attacks.
+
+---
+
+## Retry policy
+
+ListBee retries failed deliveries with exponential backoff. A delivery is considered failed if your endpoint returns a non-2xx status code or does not respond within 10 seconds.
+
+| Attempt | Delay |
+|---------|-------|
+| 1 | Immediately |
+| 2 | 30 seconds |
+| 3 | 5 minutes |
+| 4 | 30 minutes |
+| 5 | 2 hours |
+
+After 5 failed attempts, the event is dropped. Your endpoint should return `200` as quickly as possible — process the event asynchronously if needed.
+
+---
+
+## Test an endpoint
+
+Send a test event to verify your endpoint is reachable and signature verification works.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/webhooks/wh_.../test",
+    headers={"Authorization": "Bearer lb_..."},
+)
+result = resp.json()
+print(result["delivered"])    # True if your endpoint returned 2xx
+print(result["status_code"])  # HTTP status your endpoint returned
+```
+
+```typescript title="TypeScript"
+const resp = await fetch(
+  "https://api.listbee.so/v1/webhooks/wh_.../test",
+  {
+    method: "POST",
+    headers: { "Authorization": "Bearer lb_..." },
+  }
+);
+const result = await resp.json();
+console.log(result.delivered);    // true if your endpoint returned 2xx
+console.log(result.status_code);  // HTTP status your endpoint returned
+```
+
+</CodeGroup>
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — webhooks
+#
+# Register:
+#   POST /v1/webhooks  { "url": "https://...", "events": ["order.paid", ...] }
+#   → { "id": "wh_...", "secret": "whsec_..." }  ← secret shown once, store it
+#
+# Events:
+#   order.created    buyer opened Stripe Checkout (status: pending)
+#   order.paid       payment confirmed, content delivered
+#   listing.created  new listing created
+#   listing.updated  listing field changed
+#   listing.deleted  listing deleted
+#
+# Payload envelope:
+#   { "id": "evt_...", "object": "event", "type": "order.paid",
+#     "created_at": "...", "data": { "object": { <full resource> } } }
+#
+# Signature verification (HMAC-SHA256):
+#   header: X-ListBee-Signature
+#   secret: whsec_... (from webhook creation)
+#   compute: hmac.new(secret, raw_body, sha256).hexdigest()
+#   compare with timing-safe equality
+#
+# Retry policy (exponential backoff on non-2xx or timeout):
+#   attempt 1: immediate
+#   attempt 2: 30s
+#   attempt 3: 5m
+#   attempt 4: 30m
+#   attempt 5: 2h  (then dropped)
+#
+# Test endpoint:
+#   POST /v1/webhooks/{id}/test  → { "delivered": bool, "status_code": int }
+#
+# Auth: Authorization: Bearer lb_...
+```
+</CodeBlock>

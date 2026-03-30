@@ -86,7 +86,6 @@ def create_listing_with_backoff(payload: dict, max_attempts: int = 5) -> dict:
 listing = create_listing_with_backoff({
     "name": "Python Async Patterns",
     "price": 1900,
-    "currency": "usd",
     "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
 })
 print(listing["url"])

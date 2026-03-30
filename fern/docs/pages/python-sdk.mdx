@@ -47,7 +47,6 @@ client = ListBee()  # reads LISTBEE_API_KEY from environment
 listing = client.listings.create(
     name="Python Async Patterns",
     price=1900,          # cents — $19.00
-    currency="usd",
     content="https://my-bucket.s3.amazonaws.com/python-async.pdf",
 )
 
@@ -61,7 +60,6 @@ Optional fields:
 listing = client.listings.create(
     name="SQL Performance Guide",
     price=2900,
-    currency="usd",
     content="https://my-bucket.s3.amazonaws.com/sql-guide.pdf",
     description="50 query patterns for high-traffic Postgres databases.",
     slug="sql-performance-guide",  # auto-generated if omitted
@@ -285,7 +283,6 @@ async def main():
     listing = await client.listings.create(
         name="Python Async Patterns",
         price=1900,
-        currency="usd",
         content="https://my-bucket.s3.amazonaws.com/python-async.pdf",
     )
     print(listing.url)
@@ -316,7 +313,7 @@ All methods on `AsyncListBee` are `async` and return the same typed objects as t
 #   client = AsyncListBee(api_key="lb_...")
 #
 # Methods:
-#   client.listings.create(name, price, currency, content, **kwargs)  → Listing
+#   client.listings.create(name, price, content, **kwargs)            → Listing
 #   client.listings.list(cursor=None, limit=20)                        → Page[Listing]
 #   client.listings.get(slug)                                          → Listing
 #   client.listings.update(slug, **kwargs)                             → Listing

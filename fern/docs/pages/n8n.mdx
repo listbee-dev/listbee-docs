@@ -126,7 +126,7 @@ If you need an operation not covered by the community node, use the **HTTP Reque
 | Header Auth Name | `Authorization` |
 | Header Auth Value | `Bearer lb_...` |
 | Body Content Type | JSON |
-| Body | `{ "name": "My Product", "price": 1900, "currency": "usd", "content": "https://..." }` |
+| Body | `{ "name": "My Product", "price": 1900, "content": "https://..." }` |
 
 ---
 
@@ -188,7 +188,7 @@ Slack — Send Message
 # Node operations:
 #
 #   Listing / Create:
-#     name (str), price (int, cents), currency (str), content (str)
+#     name (str), price (int, cents), content (str)
 #     optional: description, slug
 #     output: listing object — use {{ $json.url }} for checkout URL
 #
@@ -207,7 +207,7 @@ Slack — Send Message
 #   URL:         https://api.listbee.so/v1/listings
 #   Auth:        Header Auth — Authorization: Bearer lb_...
 #   Body type:   JSON
-#   Body:        { "name": "...", "price": 1900, "currency": "usd", "content": "..." }
+#   Body:        { "name": "...", "price": 1900, "content": "..." }
 #
 # Webhook trigger:
 #   Register: POST /v1/webhooks { "url": "...", "events": ["order.paid"] }

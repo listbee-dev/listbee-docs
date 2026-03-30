@@ -37,7 +37,6 @@ resp = httpx.post(
     json={
         "name": "Advanced Python Patterns",
         "price": 2900,
-        "currency": "usd",
         "content": "https://my-bucket.s3.amazonaws.com/advanced-python.pdf",
         # ^ PDF URL — detected as FILE
     },
@@ -65,7 +64,6 @@ resp = httpx.post(
     json={
         "name": "Private Research Notes",
         "price": 1500,
-        "currency": "usd",
         "content": "https://www.notion.so/your-page-id",
         # ^ HTML URL — detected as URL
     },
@@ -93,7 +91,6 @@ resp = httpx.post(
     json={
         "name": "Premium API Access",
         "price": 4900,
-        "currency": "usd",
         "content": "LICENSE-KEY-ABCD-1234-EFGH-5678",
         # ^ Not a URL — detected as TEXT
     },

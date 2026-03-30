@@ -16,19 +16,16 @@ Create a `catalog.json` file with your listings:
   {
     "name": "Python Async Patterns",
     "price": 1900,
-    "currency": "usd",
     "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf"
   },
   {
     "name": "FastAPI Production Guide",
     "price": 2900,
-    "currency": "usd",
     "content": "https://my-bucket.s3.amazonaws.com/fastapi-guide.pdf"
   },
   {
     "name": "SQL for Data Scientists",
     "price": 1500,
-    "currency": "usd",
     "content": "https://my-bucket.s3.amazonaws.com/sql-datascience.pdf"
   }
 ]
@@ -234,9 +231,9 @@ python storefront.py create --catalog catalog.json --then-watch
 
 ```
 Creating 3 listings...
-  ✓ Python Async Patterns           https://buy.listbee.so/python-async-patterns  sellable=True
-  ✓ FastAPI Production Guide        https://buy.listbee.so/fastapi-production-guide  sellable=True
-  ✓ SQL for Data Scientists         https://buy.listbee.so/sql-for-data-scientists  sellable=True
+  ✓ Python Async Patterns           https://buy.listbee.so/r7kq2xy9  sellable=True
+  ✓ FastAPI Production Guide        https://buy.listbee.so/m3pr5tw1  sellable=True
+  ✓ SQL for Data Scientists         https://buy.listbee.so/vb8azn4j  sellable=True
 
 Created 3 of 3 listings.
 
@@ -255,7 +252,7 @@ Watching for orders (polling every 30s)... Ctrl+C to stop.
 # ListBee — bulk listing creation + order polling
 #
 # Create listings from JSON array:
-#   POST /v1/listings  { name, price (cents), currency, content }
+#   POST /v1/listings  { name, price (cents), content }
 #   Use Idempotency-Key header per request (uuid4)
 #   Response: { id, slug, url, readiness: { sellable, actions, next } }
 #

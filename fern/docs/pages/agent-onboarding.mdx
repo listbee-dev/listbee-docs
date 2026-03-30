@@ -206,13 +206,12 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,          # cents
-        "currency": "usd",
         "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
     },
 )
 listing = resp.json()
 
-print(listing["url"])                   # https://buy.listbee.so/python-async-patterns
+print(listing["url"])                   # https://buy.listbee.so/r7kq2xy9
 print(listing["readiness"]["sellable"]) # True
 ```
 
@@ -224,7 +223,7 @@ The `url` field is the product page. When `readiness.sellable` is `true`, buyers
 
 **Agent says:**
 > Your listing is live. Share this URL with buyers:
-> https://buy.listbee.so/python-async-patterns
+> https://buy.listbee.so/r7kq2xy9
 >
 > When someone pays, they receive the PDF automatically by email.
 
@@ -288,7 +287,6 @@ listing = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,
-        "currency": "usd",
         "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
     },
 ).json()
@@ -335,7 +333,7 @@ print(f"Your listing is live: {listing['url']}")
 #   → account.readiness.operational: true when ready
 #
 # STEP 7: Create listing
-#   POST /v1/listings  { "name", "price" (cents), "currency", "content" (URL or text) }
+#   POST /v1/listings  { "name", "price" (cents), "content" (URL or text) }
 #   Auth: Bearer lb_...
 #   → 201 { object, id, slug, url, readiness: { sellable, actions, next }, ... }
 #

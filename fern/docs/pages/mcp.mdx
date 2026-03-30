@@ -91,7 +91,6 @@ Each tool maps directly to a ListBee API endpoint.
 |-----------|------|----------|-------------|
 | `name` | string | Yes | Product name |
 | `price` | integer | Yes | Price in cents (e.g. `1900` = $19.00) |
-| `currency` | string | Yes | ISO 4217 currency code (e.g. `"usd"`) |
 | `content` | string | Yes | URL or text payload delivered to buyers |
 | `description` | string | No | Product description shown on checkout page |
 | `slug` | string | No | URL slug — auto-generated from name if omitted |
@@ -104,7 +103,6 @@ All fields are optional. Only the fields you provide are updated.
 |-----------|------|-------------|
 | `name` | string | New product name |
 | `price` | integer | New price in cents |
-| `currency` | string | New currency code |
 | `content` | string | New content URL or payload |
 | `description` | string | New description |
 
@@ -121,11 +119,11 @@ All fields are optional. Only the fields you provide are updated.
 
 Once the MCP server is configured, you can ask Claude directly:
 
-> Create a listing called "SQL Performance Guide", price $29, currency USD, content at https://my-bucket.s3.amazonaws.com/sql-guide.pdf
+> Create a listing called "SQL Performance Guide", price $29, content at https://my-bucket.s3.amazonaws.com/sql-guide.pdf
 
 Claude will call `create_listing` and return:
 
-> Done. Your listing is live at: https://buy.listbee.so/sql-performance-guide
+> Done. Your listing is live at: https://buy.listbee.so/xp6wq2dk
 
 ---
 
@@ -161,10 +159,10 @@ Get your API key at [console.listbee.so](https://console.listbee.so).
 #
 # Available tools:
 #   get_account       GET  /v1/account
-#   create_listing    POST /v1/listings         { name, price (cents), currency, content }
+#   create_listing    POST /v1/listings         { name, price (cents), content }
 #   list_listings     GET  /v1/listings         { cursor?, limit? }
 #   get_listing       GET  /v1/listings/{slug}
-#   update_listing    PUT  /v1/listings/{slug}  { name?, price?, currency?, content?, description? }
+#   update_listing    PUT  /v1/listings/{slug}  { name?, price?, content?, description? }
 #   delete_listing    DELETE /v1/listings/{slug}
 #   list_orders       GET  /v1/orders           { cursor?, limit? }
 #   get_order         GET  /v1/orders/{id}

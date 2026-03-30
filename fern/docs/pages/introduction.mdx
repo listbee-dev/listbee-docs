@@ -7,7 +7,7 @@ ListBee is a REST API for creating and selling digital content. The primary reso
 
 ## Create a listing
 
-Three required fields: `name`, `price`, `currency`. Add `content` and the listing can sell immediately.
+Two required fields: `name` and `price`. Add `content` and the listing can sell immediately. Currency is determined by your account settings.
 
 ```python
 from listbee import ListBee
@@ -17,11 +17,10 @@ client = ListBee(api_key="lb_...")
 listing = client.listings.create(
     name="Python Async Patterns",
     price=1900,        # cents
-    currency="usd",
     content="https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
 )
 
-print(listing.url)        # https://buy.listbee.so/python-async-patterns
+print(listing.url)        # https://buy.listbee.so/r7kq2xy9
 print(listing.readiness.sellable)  # True — buyers can purchase now
 ```
 
@@ -77,7 +76,7 @@ Agents never touch payment data. Humans never interact with the API.
 #   1. POST /v1/account/signup    { email }                  → OTP sent
 #   2. POST /v1/account/verify    { email, code }            → api_key
 #   3. POST /v1/account/stripe-key { secret_key }            → account.readiness.operational
-#   4. POST /v1/listings          { name, price, currency, content } → listing.url + readiness.sellable
+#   4. POST /v1/listings          { name, price, content } → listing.url + readiness.sellable
 #
 # Listing response includes:
 #   - url:                product page URL (share with buyers)

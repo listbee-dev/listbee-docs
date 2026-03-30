@@ -137,13 +137,12 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,      # $19.00
-        "currency": "usd",
         "content": "https://alex-bucket.s3.amazonaws.com/python-async.pdf",
     },
 )
 listing = resp.json()
 
-print(listing["url"])                   # https://buy.listbee.so/python-async-patterns
+print(listing["url"])                   # https://buy.listbee.so/r7kq2xy9
 print(listing["readiness"]["sellable"]) # True
 ```
 
@@ -176,7 +175,7 @@ else:
 **Agent says to user:**
 > Your ebook is live. Share this URL with buyers:
 >
-> **https://buy.listbee.so/python-async-patterns**
+> **https://buy.listbee.so/r7kq2xy9**
 >
 > When someone pays $19, they receive the PDF by email automatically.
 
@@ -247,7 +246,6 @@ def create_listing(api_key: str, name: str, price_cents: int, content_url: str) 
         json={
             "name": name,
             "price": price_cents,
-            "currency": "usd",
             "content": content_url,
         },
     ).json()
@@ -290,7 +288,7 @@ else:
 #    next == "connect_stripe" (kind: human) → POST /v1/account/stripe/connect → send URL to user
 #
 # 3. Create listing with idempotency key
-#    POST /v1/listings  { name, price (cents), currency, content (URL or text) }
+#    POST /v1/listings  { name, price (cents), content (URL or text) }
 #    Header: Idempotency-Key: <uuid>
 #    → listing.url (share with buyers)
 #    → listing.readiness.sellable: true when buyers can purchase

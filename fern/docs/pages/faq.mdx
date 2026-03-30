@@ -70,7 +70,7 @@ Directly to your Stripe account. ListBee deducts the platform fee (10%, 5%, or 3
 
 ## Can I update a listing after creating it?
 
-Yes, but not the content. Use `PUT /v1/listings/{slug}` to update name, price, currency, description, and cover image. The `content` field is immutable — delete the listing and recreate it to change the content payload.
+Yes, but not the content. Use `PUT /v1/listings/{slug}` to update name, price, description, and cover image. The `content` field is immutable — delete the listing and recreate it to change the content payload.
 
 ---
 
@@ -111,7 +111,7 @@ Use a `sk_test_...` Stripe key instead of `sk_live_...`. Stripe test mode lets y
 # Content types: FILE (PDF/ZIP/etc → CDN + signed URL), URL (redirect), TEXT (inline)
 # Content is immutable after listing creation — delete and recreate to change
 #
-# Updates via PUT /v1/listings/{slug}: name, price, currency, description, cover
+# Updates via PUT /v1/listings/{slug}: name, price, description, cover
 #
 # After purchase: buyer gets email with content. order.completed webhook fired.
 # Refunds: via Stripe dashboard — no ListBee refund API.

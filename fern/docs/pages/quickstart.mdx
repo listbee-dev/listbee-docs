@@ -119,7 +119,7 @@ Don't have a Stripe account yet? Call `POST /v1/account/stripe/connect` to start
 
 ## Step 3: Create a listing
 
-Four required fields: `name`, `price` (in cents), `currency`, `content` (a URL or text payload).
+Three required fields: `name`, `price` (in cents), and `content` (a URL or text payload). Currency is determined by your account settings.
 
 <CodeGroup>
 
@@ -135,13 +135,12 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,      # $19.00 in cents
-        "currency": "usd",
         "content": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
     },
 )
 listing = resp.json()
 
-print(listing["url"])                      # https://buy.listbee.so/python-async-patterns
+print(listing["url"])                      # https://buy.listbee.so/r7kq2xy9
 print(listing["readiness"]["sellable"])    # True — buyers can purchase now
 ```
 
@@ -158,13 +157,12 @@ const resp = await fetch(`${BASE}/v1/listings`, {
   body: JSON.stringify({
     name: "Python Async Patterns",
     price: 1900,     // $19.00 in cents
-    currency: "usd",
     content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
   }),
 });
 const listing = await resp.json();
 
-console.log(listing.url);                    // https://buy.listbee.so/python-async-patterns
+console.log(listing.url);                    // https://buy.listbee.so/r7kq2xy9
 console.log(listing.readiness.sellable);     // true — buyers can purchase now
 ```
 
@@ -212,7 +210,7 @@ If `sellable` is `false`, check `readiness.actions` — each action has a `code`
 #   (New Stripe users: POST /v1/account/stripe/connect → { url } to open in browser)
 #
 # Step 3: Listing
-#   POST /v1/listings  { "name", "price" (cents), "currency", "content" }
+#   POST /v1/listings  { "name", "price" (cents), "content" }
 #     → 201 { object, id, slug, url, readiness: { sellable, actions, next }, ... }
 #
 # All requests: Authorization: Bearer lb_...

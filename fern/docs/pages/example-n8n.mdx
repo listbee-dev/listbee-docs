@@ -39,7 +39,6 @@ Use an **HTTP Request** node to call `POST /v1/listings`.
 {
   "name": "Python Async Patterns",
   "price": 1900,
-  "currency": "usd",
   "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf"
 }
 ```
@@ -148,7 +147,6 @@ Copy and import this into n8n via **File → Import from JSON**:
           "parameters": [
             { "name": "name", "value": "Python Async Patterns" },
             { "name": "price", "value": 1900 },
-            { "name": "currency", "value": "usd" },
             { "name": "content", "value": "https://my-bucket.s3.amazonaws.com/python-async.pdf" }
           ]
         }
@@ -215,7 +213,7 @@ The community node provides credential management, typed fields, and auto-comple
 #   Method: POST
 #   URL: https://api.listbee.so/v1/listings
 #   Header: Authorization: Bearer lb_...
-#   Body: { name, price (cents), currency, content }
+#   Body: { name, price (cents), content }
 #
 # Option B: Community node (recommended)
 #   Install: n8n-nodes-listbee

@@ -39,7 +39,7 @@ All error responses use [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 | `401` | Unauthorized | No API key provided, or the key is invalid or revoked. |
 | `404` | Not found | The resource does not exist, or you do not have access to it. |
 | `409` | Conflict | The request conflicts with existing state (e.g. duplicate idempotency key with different body). |
-| `422` | Unprocessable entity | The request is well-formed but fails validation (e.g. negative price, unsupported currency). |
+| `422` | Unprocessable entity | The request is well-formed but fails validation (e.g. negative price, missing required field). |
 | `429` | Too many requests | Rate limit exceeded. See the `Retry-After` header for when to retry. |
 | `500` | Internal server error | Something went wrong on ListBee's side. Retrying with backoff is appropriate. |
 
@@ -74,7 +74,7 @@ import httpx
 resp = httpx.post(
     "https://api.listbee.so/v1/listings",
     headers={"Authorization": "Bearer lb_..."},
-    json={"name": "My Guide", "price": -100, "currency": "usd"},
+    json={"name": "My Guide", "price": -100},
 )
 
 if not resp.is_success:
@@ -100,7 +100,7 @@ const resp = await fetch("https://api.listbee.so/v1/listings", {
     "Authorization": "Bearer lb_...",
     "Content-Type": "application/json",
   },
-  body: JSON.stringify({ name: "My Guide", price: -100, currency: "usd" }),
+  body: JSON.stringify({ name: "My Guide", price: -100 }),
 });
 
 if (!resp.ok) {

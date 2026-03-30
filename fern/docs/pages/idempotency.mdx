@@ -69,7 +69,6 @@ idempotency_key = str(uuid.uuid4())
 payload = {
     "name": "Python Async Patterns",
     "price": 1900,
-    "currency": "usd",
     "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
 }
 
@@ -87,7 +86,7 @@ for attempt in range(3):
         )
         resp.raise_for_status()
         listing = resp.json()
-        print(listing["url"])  # https://buy.listbee.so/python-async-patterns
+        print(listing["url"])  # https://buy.listbee.so/m3pr5tw1
         break
     except (httpx.TimeoutException, httpx.NetworkError) as exc:
         if attempt == 2:
@@ -107,7 +106,6 @@ const idempotencyKey = randomUUID();
 const payload = {
   name: "Python Async Patterns",
   price: 1900,
-  currency: "usd",
   content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
 };
 
@@ -130,7 +128,7 @@ for (let attempt = 0; attempt < 3; attempt++) {
     }
 
     const listing = await resp.json();
-    console.log(listing.url); // https://buy.listbee.so/python-async-patterns
+    console.log(listing.url); // https://buy.listbee.so/m3pr5tw1
     break;
   } catch (err) {
     if (attempt === 2) throw err;

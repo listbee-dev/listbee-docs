@@ -94,6 +94,9 @@ navigation:
             path: ./docs/pages/rate-limits.mdx
           - page: Content Types
             path: ./docs/pages/content-types.mdx
+          - page: Google Analytics tracking
+            slug: analytics
+            path: ./docs/pages/analytics.mdx
 
       - section: Examples
         skip-slug: true

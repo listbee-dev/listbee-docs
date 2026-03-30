@@ -1,0 +1,17 @@
+---
+title: "Google Analytics tracking"
+date: 2026-03-30
+tags: ["api", "new-feature"]
+---
+
+Sellers can now connect a GA4 Measurement ID to their account. ListBee injects `gtag.js` on product pages and thank-you pages, and fires a `purchase` event when an order completes. UTM parameters are configurable per listing with sensible defaults.
+
+## What changed
+
+- **New:** `ga_measurement_id` field on `AccountResponse` — GA4 Measurement ID associated with the account
+- **New:** `PUT /v1/account` now accepts `ga_measurement_id` — set or clear the Measurement ID (`G-XXXXXXXXXX` format, or `null`)
+- **New:** `utm_source`, `utm_medium`, `utm_campaign` fields on `CreateListingRequest`, `UpdateListingRequest`, and `ListingResponse` — override per-listing UTM attribution (all optional, max 100 chars each)
+- **Behavior:** When `ga_measurement_id` is set, `gtag.js` is injected on product pages and thank-you pages; a `purchase` event fires on the thank-you page with `transaction_id`, `value`, and `currency`
+- **Behavior:** UTM defaults applied at render time — `utm_source` → `listbee`, `utm_medium` → `product_page`, `utm_campaign` → listing slug; null fields use defaults
+
+See the [Google Analytics tracking guide](/analytics) for setup steps and code examples.

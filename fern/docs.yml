@@ -79,6 +79,8 @@ navigation:
             path: ./docs/pages/claude-code-skill.mdx
           - page: Python SDK
             path: ./docs/pages/python-sdk.mdx
+          - page: TypeScript SDK
+            path: ./docs/pages/typescript-sdk.mdx
           - page: n8n Node
             slug: n8n
             path: ./docs/pages/n8n.mdx

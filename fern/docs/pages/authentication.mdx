@@ -43,26 +43,22 @@ account_id = data["account"]["id"]  # acc_...
 ```
 
 ```typescript title="TypeScript"
-const BASE = "https://api.listbee.so";
+import { ListBee } from "listbee";
+
+const client = new ListBee(); // no apiKey needed for signup
 
 // Step 1: request OTP
-await fetch(`${BASE}/v1/account/signup`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: "you@example.com" }),
-});
+await client.signup.create({ email: "you@example.com" });
 // 200 OK — 6-digit code sent to you@example.com
 
 // Step 2: verify and receive API key
-const resp = await fetch(`${BASE}/v1/account/verify`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: "you@example.com", code: "123456" }),
+const result = await client.signup.verify({
+  email: "you@example.com",
+  code: "123456",
 });
-const data = await resp.json();
 
-const apiKey = data.api_key;           // lb_... — store securely
-const accountId = data.account.id;     // acc_...
+const apiKey = result.api_key;           // lb_... — store securely
+const accountId = result.account.id;     // acc_...
 ```
 
 </CodeGroup>
@@ -93,15 +89,11 @@ print(key["name"])     # production
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/api-keys", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ name: "production" }),
-});
-const key = await resp.json();
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const key = await client.apiKeys.create({ name: "production" });
 
 console.log(key.id);    // lbk_...
 console.log(key.key);   // lb_... — shown once, store now
@@ -130,12 +122,13 @@ for key in result["data"]:
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/api-keys", {
-  headers: { "Authorization": "Bearer lb_..." },
-});
-const result = await resp.json();
+import { ListBee } from "listbee";
 
-for (const key of result.data) {
+const client = new ListBee({ apiKey: "lb_..." });
+
+const page = await client.apiKeys.list();
+
+for (const key of page.data) {
   console.log(key.id, key.name, key.prefix);
   // lbk_...   production   lb_live_abc
   // The full key value is NOT returned — prefix only.
@@ -159,11 +152,12 @@ httpx.delete(
 ```
 
 ```typescript title="TypeScript"
-await fetch("https://api.listbee.so/v1/api-keys/lbk_...", {
-  method: "DELETE",
-  headers: { "Authorization": "Bearer lb_..." },
-});
-// 204 No Content — key is revoked immediately
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+await client.apiKeys.delete("lbk_...");
+// Key is revoked immediately
 ```
 
 </CodeGroup>

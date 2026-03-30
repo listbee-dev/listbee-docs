@@ -31,18 +31,14 @@ print(webhook["secret"])  # whsec_... — store this, it's shown once
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/webhooks", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    url: "https://yourapp.com/webhooks/listbee",
-    events: ["order.paid", "listing.created"],
-  }),
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const webhook = await client.webhooks.create({
+  url: "https://yourapp.com/webhooks/listbee",
+  events: ["order.paid", "listing.created"],
 });
-const webhook = await resp.json();
 
 console.log(webhook.id);      // wh_...
 console.log(webhook.secret);  // whsec_... — store this, it's shown once
@@ -206,14 +202,11 @@ print(result["status_code"])  # HTTP status your endpoint returned
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch(
-  "https://api.listbee.so/v1/webhooks/wh_.../test",
-  {
-    method: "POST",
-    headers: { "Authorization": "Bearer lb_..." },
-  }
-);
-const result = await resp.json();
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const result = await client.webhooks.test("wh_...");
 console.log(result.delivered);    // true if your endpoint returned 2xx
 console.log(result.status_code);  // HTTP status your endpoint returned
 ```

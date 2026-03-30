@@ -35,19 +35,15 @@ print(listing["readiness"]["sellable"])  # True — buyers can purchase now
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/listings", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    name: "Python Async Patterns",
-    price: 1900,     // $19.00 in cents
-    content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
-  }),
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.create({
+  name: "Python Async Patterns",
+  price: 1900,     // $19.00 in cents
+  content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
 });
-const listing = await resp.json();
 
 console.log(listing.url);                   // https://buy.listbee.so/r7kq2xy9
 console.log(listing.slug);                  // r7kq2xy9
@@ -98,21 +94,14 @@ print(listing["price"])    # 2500
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch(
-  "https://api.listbee.so/v1/listings/r7kq2xy9",
-  {
-    method: "PUT",
-    headers: {
-      "Authorization": "Bearer lb_...",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      price: 2500,   // raise price to $25.00
-      tagline: "Production-ready async patterns for Python 3.10+",
-    }),
-  }
-);
-const listing = await resp.json();
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.update("r7kq2xy9", {
+  price: 2500,   // raise price to $25.00
+  tagline: "Production-ready async patterns for Python 3.10+",
+});
 console.log(listing.price);    // 2500
 ```
 
@@ -137,14 +126,12 @@ resp = httpx.delete(
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch(
-  "https://api.listbee.so/v1/listings/r7kq2xy9",
-  {
-    method: "DELETE",
-    headers: { "Authorization": "Bearer lb_..." },
-  }
-);
-// 204 No Content on success
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+await client.listings.delete("r7kq2xy9");
+// Returns void on success
 ```
 
 </CodeGroup>

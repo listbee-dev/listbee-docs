@@ -33,15 +33,13 @@ print(account["ga_measurement_id"])  # G-ABC123XYZ
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/account", {
-  method: "PUT",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ ga_measurement_id: "G-ABC123XYZ" }),
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const account = await client.account.update({
+  ga_measurement_id: "G-ABC123XYZ",
 });
-const account = await resp.json();
 
 console.log(account.ga_measurement_id); // G-ABC123XYZ
 ```
@@ -61,14 +59,11 @@ httpx.put(
 ```
 
 ```typescript title="TypeScript"
-await fetch("https://api.listbee.so/v1/account", {
-  method: "PUT",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ ga_measurement_id: null }),
-});
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+await client.account.update({ ga_measurement_id: null });
 ```
 
 </CodeGroup>
@@ -137,22 +132,18 @@ print(listing["utm_campaign"])  # march-2026-launch
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/listings", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    name: "Python Async Patterns",
-    price: 1900,
-    content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
-    utm_source: "newsletter",
-    utm_medium: "email",
-    utm_campaign: "march-2026-launch",
-  }),
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.create({
+  name: "Python Async Patterns",
+  price: 1900,
+  content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+  utm_source: "newsletter",
+  utm_medium: "email",
+  utm_campaign: "march-2026-launch",
 });
-const listing = await resp.json();
 
 console.log(listing.utm_source);    // newsletter
 console.log(listing.utm_medium);    // email
@@ -188,19 +179,15 @@ print(listing["utm_campaign"])  # None
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/listings", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    name: "Python Async Patterns",
-    price: 1900,
-    content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
-  }),
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.create({
+  name: "Python Async Patterns",
+  price: 1900,
+  content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
 });
-const listing = await resp.json();
 
 // UTM fields are null — defaults apply at render time
 console.log(listing.utm_source);    // null
@@ -231,22 +218,15 @@ print(listing["utm_campaign"])  # april-promo
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch(
-  "https://api.listbee.so/v1/listings/python-async-patterns",
-  {
-    method: "PUT",
-    headers: {
-      "Authorization": "Bearer lb_...",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      utm_source: "twitter",
-      utm_medium: "social",
-      utm_campaign: "april-promo",
-    }),
-  }
-);
-const listing = await resp.json();
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.update("python-async-patterns", {
+  utm_source: "twitter",
+  utm_medium: "social",
+  utm_campaign: "april-promo",
+});
 console.log(listing.utm_campaign); // april-promo
 ```
 

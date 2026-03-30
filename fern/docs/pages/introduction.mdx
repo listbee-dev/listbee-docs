@@ -9,7 +9,9 @@ ListBee is a REST API for creating and selling digital content. The primary reso
 
 Two required fields: `name` and `price`. Add `content` and the listing can sell immediately. Currency is determined by your account settings.
 
-```python
+<CodeGroup>
+
+```python title="Python"
 from listbee import ListBee
 
 client = ListBee(api_key="lb_...")
@@ -23,6 +25,23 @@ listing = client.listings.create(
 print(listing.url)        # https://buy.listbee.so/r7kq2xy9
 print(listing.readiness.sellable)  # True — buyers can purchase now
 ```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.create({
+  name: "Python Async Patterns",
+  price: 1900,        // cents
+  content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+});
+
+console.log(listing.url);               // https://buy.listbee.so/r7kq2xy9
+console.log(listing.readiness.sellable); // true — buyers can purchase now
+```
+
+</CodeGroup>
 
 The `url` field is the product page. Share it with buyers directly. No additional setup required if Stripe is already connected.
 

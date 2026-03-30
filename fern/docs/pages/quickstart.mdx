@@ -37,27 +37,23 @@ print(f"Account: {account['id']}")  # acc_...
 ```
 
 ```typescript title="TypeScript"
-const BASE = "https://api.listbee.so";
+import { ListBee } from "listbee";
+
+const client = new ListBee(); // no apiKey needed for signup
 
 // 1a. Request OTP
-await fetch(`${BASE}/v1/account/signup`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: "you@example.com" }),
-});
+await client.signup.create({ email: "you@example.com" });
 
 // Check your inbox for the 6-digit code, then:
 
 // 1b. Verify and get API key
-const resp = await fetch(`${BASE}/v1/account/verify`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: "you@example.com", code: "123456" }),
+const result = await client.signup.verify({
+  email: "you@example.com",
+  code: "123456",
 });
-const data = await resp.json();
 
-const apiKey = data.api_key;        // lb_...
-const account = data.account;       // account object
+const apiKey = result.api_key;        // lb_...
+const account = result.account;       // account object
 console.log(`API key: ${apiKey}`);
 console.log(`Account: ${account.id}`); // acc_...
 ```
@@ -91,18 +87,13 @@ print(account["readiness"]["operational"])  # True — ready to sell
 ```
 
 ```typescript title="TypeScript"
-const BASE = "https://api.listbee.so";
-const API_KEY = "lb_..."; // from step 1
+import { ListBee } from "listbee";
 
-const resp = await fetch(`${BASE}/v1/account/stripe-key`, {
-  method: "POST",
-  headers: {
-    "Authorization": `Bearer ${API_KEY}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ secret_key: "sk_live_..." }),
+const client = new ListBee({ apiKey: "lb_..." }); // from step 1
+
+const account = await client.stripe.setKey({
+  secretKey: "sk_live_...",
 });
-const account = await resp.json();
 
 console.log(account.readiness.operational); // true — ready to sell
 ```
@@ -145,22 +136,15 @@ print(listing["readiness"]["sellable"])    # True — buyers can purchase now
 ```
 
 ```typescript title="TypeScript"
-const BASE = "https://api.listbee.so";
-const API_KEY = "lb_..."; // from step 1
+import { ListBee } from "listbee";
 
-const resp = await fetch(`${BASE}/v1/listings`, {
-  method: "POST",
-  headers: {
-    "Authorization": `Bearer ${API_KEY}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    name: "Python Async Patterns",
-    price: 1900,     // $19.00 in cents
-    content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
-  }),
+const client = new ListBee({ apiKey: "lb_..." }); // from step 1
+
+const listing = await client.listings.create({
+  name: "Python Async Patterns",
+  price: 1900,     // $19.00 in cents
+  content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
 });
-const listing = await resp.json();
 
 console.log(listing.url);                    // https://buy.listbee.so/r7kq2xy9
 console.log(listing.readiness.sellable);     // true — buyers can purchase now
@@ -188,6 +172,9 @@ If `sellable` is `false`, check `readiness.actions` — each action has a `code`
   </Card>
   <Card title="Python SDK" href="/python-sdk">
     Typed client — `pip install listbee`.
+  </Card>
+  <Card title="TypeScript SDK" href="/typescript-sdk">
+    Typed client — `npm install listbee`.
   </Card>
 </Cards>
 

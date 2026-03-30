@@ -76,22 +76,22 @@ if result["has_more"]:
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch(
-  "https://api.listbee.so/v1/orders?limit=20",
-  { headers: { "Authorization": "Bearer lb_..." } }
-);
-const result = await resp.json();
+import { ListBee } from "listbee";
 
-for (const order of result.data) {
+const client = new ListBee({ apiKey: "lb_..." });
+
+const page = await client.orders.list({ limit: 20 });
+
+for (const order of page.data) {
   console.log(order.id, order.status, order.amount);
 }
 
 // Paginate
-if (result.has_more) {
-  const nextResp = await fetch(
-    `https://api.listbee.so/v1/orders?limit=20&cursor=${result.cursor}`,
-    { headers: { "Authorization": "Bearer lb_..." } }
-  );
+if (page.has_more) {
+  const nextPage = await client.orders.list({
+    limit: 20,
+    cursor: page.cursor,
+  });
 }
 ```
 
@@ -136,11 +136,11 @@ print(order["created_at"])    # ISO 8601 timestamp
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch(
-  "https://api.listbee.so/v1/orders/ord_...",
-  { headers: { "Authorization": "Bearer lb_..." } }
-);
-const order = await resp.json();
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const order = await client.orders.get("ord_...");
 
 console.log(order.id);            // ord_...
 console.log(order.status);        // paid

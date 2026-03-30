@@ -94,28 +94,24 @@ if not resp.is_success:
 ```
 
 ```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/listings", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ name: "My Guide", price: -100 }),
-});
+import { ListBee, ValidationError, AuthenticationError, RateLimitError, ListBeeError } from "listbee";
 
-if (!resp.ok) {
-  const error = await resp.json();
-  const { code, param, detail } = error;
+const client = new ListBee({ apiKey: "lb_..." });
 
-  if (code === "invalid_field") {
-    console.error(`Validation error on field '${param}': ${detail}`);
-  } else if (code === "authentication_required") {
+try {
+  const listing = await client.listings.create({
+    name: "My Guide",
+    price: -100,
+  });
+} catch (e) {
+  if (e instanceof ValidationError) {
+    console.error(`Validation error on field '${e.param}': ${e.detail}`);
+  } else if (e instanceof AuthenticationError) {
     console.error("Check your API key.");
-  } else if (resp.status === 429) {
-    const retryAfter = resp.headers.get("Retry-After") ?? "60";
-    console.error(`Rate limited. Retry after ${retryAfter} seconds.`);
-  } else {
-    console.error(`Error ${resp.status}: ${detail}`);
+  } else if (e instanceof RateLimitError) {
+    console.error(`Rate limited. Reset: ${e.reset}`);
+  } else if (e instanceof ListBeeError) {
+    console.error(`Error ${e.status}: ${e.detail}`);
   }
 }
 ```

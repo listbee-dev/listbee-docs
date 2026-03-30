@@ -76,7 +76,6 @@ Add a **ListBee** node to your workflow and configure it as follows:
 | Operation | Create |
 | Name | `My Product` (or expression from previous node) |
 | Price | `1900` (cents — $19.00) |
-| Currency | `usd` |
 | Content | `https://my-bucket.s3.amazonaws.com/file.pdf` |
 
 The node outputs the full listing object. Use `{{ $json.url }}` in downstream nodes to access the checkout URL.

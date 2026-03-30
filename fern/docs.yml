@@ -20,6 +20,7 @@ tabs:
   documentation:
     display-name: Documentation
     icon: book-open
+    skip-slug: true
   api:
     display-name: API Reference
     icon: code
@@ -32,6 +33,7 @@ navigation:
   - tab: documentation
     layout:
       - section: Getting Started
+        skip-slug: true
         contents:
           - page: Welcome
             path: ./docs/pages/welcome.mdx
@@ -41,12 +43,15 @@ navigation:
             path: ./docs/pages/quickstart.mdx
 
       - section: Core Concepts
+        skip-slug: true
         contents:
           - page: Listings
             path: ./docs/pages/listings.mdx
           - page: Orders & Delivery
+            slug: orders
             path: ./docs/pages/orders.mdx
           - page: Readiness System
+            slug: readiness
             path: ./docs/pages/readiness.mdx
           - page: Payments
             path: ./docs/pages/payments.mdx
@@ -56,19 +61,25 @@ navigation:
             path: ./docs/pages/errors.mdx
 
       - section: Agent Integration
+        skip-slug: true
         contents:
           - page: Agent Onboarding Flow
+            slug: agent-onboarding
             path: ./docs/pages/agent-onboarding.mdx
           - page: MCP Server
+            slug: mcp
             path: ./docs/pages/mcp.mdx
           - page: Claude Code Skill
+            slug: claude-code-skill
             path: ./docs/pages/claude-code-skill.mdx
           - page: Python SDK
             path: ./docs/pages/python-sdk.mdx
           - page: n8n Node
+            slug: n8n
             path: ./docs/pages/n8n.mdx
 
       - section: Guides
+        skip-slug: true
         contents:
           - page: Authentication
             path: ./docs/pages/authentication.mdx
@@ -80,6 +91,7 @@ navigation:
             path: ./docs/pages/content-types.mdx
 
       - section: Examples
+        skip-slug: true
         contents:
           - page: Sell from Claude Code
             path: ./docs/pages/example-claude-code.mdx
@@ -89,6 +101,7 @@ navigation:
             path: ./docs/pages/example-storefront.mdx
 
       - section: Resources
+        skip-slug: true
         contents:
           - page: FAQ
             path: ./docs/pages/faq.mdx

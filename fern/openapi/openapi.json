@@ -3678,8 +3678,24 @@
   },
   "tags": [
     {
+      "name": "Signup",
+      "description": "Agent-initiated account creation with email OTP."
+    },
+    {
+      "name": "Account",
+      "description": "Account status and readiness."
+    },
+    {
+      "name": "Stripe",
+      "description": "Connect and manage Stripe payment configuration."
+    },
+    {
+      "name": "API Keys",
+      "description": "Create, list, and revoke API keys."
+    },
+    {
       "name": "Listings",
-      "description": "Create, list, get, and delete listings."
+      "description": "Create, list, get, update, and delete listings."
     },
     {
       "name": "Orders",
@@ -3688,10 +3704,6 @@
     {
       "name": "Webhooks",
       "description": "Configure webhook endpoints for event notifications."
-    },
-    {
-      "name": "Account",
-      "description": "Check account setup status."
     }
   ]
 }

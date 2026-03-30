@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'fern/openapi/**'
-  workflow_dispatch:
 
 jobs:
   generate-diff:
@@ -29,7 +28,7 @@ jobs:
 
       - name: Run oasdiff changelog
         id: oasdiff
-        uses: oasdiff/oasdiff-action/changelog@main
+        uses: oasdiff/oasdiff-action/changelog@f1496dfd70588a69099f1e7d6ac8214533091007 # main
         with:
           base: base-openapi.json
           revision: current-openapi.json

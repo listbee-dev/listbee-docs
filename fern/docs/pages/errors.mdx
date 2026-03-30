@@ -47,20 +47,20 @@ All error responses use [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 
 ## Common error codes
 
-| Code | Status | Description |
-|------|--------|-------------|
-| `authentication_required` | 401 | No API key in the `Authorization` header. |
-| `invalid_api_key` | 401 | The API key is malformed, expired, or revoked. |
-| `not_found` | 404 | The requested resource does not exist. |
-| `invalid_field` | 422 | A field failed validation. Check `param` for which field. |
-| `missing_field` | 422 | A required field was not provided. Check `param`. |
-| `unsupported_currency` | 422 | The currency code is not supported. |
-| `price_too_low` | 422 | The price is below the minimum allowed amount. |
-| `stripe_not_connected` | 422 | No Stripe account connected. The listing cannot sell. |
-| `content_fetch_failed` | 422 | ListBee could not fetch the content URL you provided. |
-| `idempotency_conflict` | 409 | Same `Idempotency-Key` was used with a different request body. |
-| `rate_limit_exceeded` | 429 | Too many requests. Respect the `Retry-After` header. |
-| `internal_error` | 500 | Unexpected server error. Safe to retry with exponential backoff. |
+| Code | Cause | Resolution |
+|------|-------|------------|
+| `authentication_required` | No API key in the `Authorization` header | Add `Authorization: Bearer lb_...` header to the request |
+| `invalid_api_key` | Key is malformed, expired, or revoked | Check key format (`lb_` prefix) or create a new key via `POST /v1/api-keys` |
+| `not_found` | Resource does not exist | Verify the ID or slug — listings use slug, not ID |
+| `invalid_field` | A field failed validation | Check the `param` field in the error response for which field, then fix the value |
+| `missing_field` | A required field was not provided | Check the `param` field, then add the missing field to the request body |
+| `unsupported_currency` | The currency code is not supported | Use a supported currency — currency is set at the account level |
+| `price_too_low` | Price is below Stripe's minimum | Set price to at least 50 (smallest currency unit, e.g. 50 cents) |
+| `stripe_not_connected` | No Stripe account linked to this account | Call `POST /v1/account/stripe-key` with your Stripe secret key |
+| `content_fetch_failed` | ListBee couldn't reach the content URL | Verify the URL is publicly accessible and returns HTTP 200 |
+| `idempotency_conflict` | Same `Idempotency-Key` sent with a different request body | Generate a new UUID for the new request |
+| `rate_limit_exceeded` | Too many requests for this endpoint | Wait for `Retry-After` header value (seconds), then retry |
+| `internal_error` | Unexpected server error | Safe to retry with exponential backoff — if persistent, contact support |
 
 ---
 
@@ -124,6 +124,13 @@ if (!resp.ok) {
 
 ---
 
+## Next steps
+
+- [Entity model](/entity-model) — see the full resource hierarchy and ID prefix reference.
+- [Rate limits](/rate-limits) — understand per-endpoint limits and backoff strategies.
+
+---
+
 ## Copy for AI assistants
 
 <CodeBlock title="Cursor / Claude Code">
@@ -136,19 +143,19 @@ if (!resp.ok) {
 # Always branch on `code` (machine-readable), not `title` (human-readable).
 # `param` identifies the offending field for validation errors; null otherwise.
 #
-# Common codes:
-#   authentication_required  401  No or invalid API key
-#   invalid_api_key          401  API key malformed, expired, or revoked
-#   not_found                404  Resource does not exist
-#   invalid_field            422  Field failed validation — check param
-#   missing_field            422  Required field absent — check param
-#   unsupported_currency     422  Currency code not supported
-#   price_too_low            422  Price below minimum
-#   stripe_not_connected     422  No Stripe connected, listing can't sell
-#   content_fetch_failed     422  Could not fetch the content URL
-#   idempotency_conflict     409  Same Idempotency-Key, different body
-#   rate_limit_exceeded      429  Too many requests — respect Retry-After header
-#   internal_error           500  Server error — safe to retry with backoff
+# Common codes (code → cause → resolution):
+#   authentication_required  401  No API key → add Authorization: Bearer lb_... header
+#   invalid_api_key          401  Key malformed/expired → check lb_ prefix or create new key
+#   not_found                404  Resource missing → verify ID/slug (listings use slug)
+#   invalid_field            422  Validation failed → check param field, fix value
+#   missing_field            422  Required field absent → check param field, add it
+#   unsupported_currency     422  Bad currency → use account-level currency
+#   price_too_low            422  Below minimum → set price >= 50 (cents)
+#   stripe_not_connected     422  No Stripe → POST /v1/account/stripe-key
+#   content_fetch_failed     422  URL unreachable → verify URL returns 200
+#   idempotency_conflict     409  Same key, diff body → generate new UUID
+#   rate_limit_exceeded      429  Too many requests → wait Retry-After seconds
+#   internal_error           500  Server error → retry with exponential backoff
 #
 # HTTP status summary:
 #   400 malformed request

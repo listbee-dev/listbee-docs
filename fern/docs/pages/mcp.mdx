@@ -5,6 +5,13 @@ description: Connect ListBee to Claude Desktop, Cursor, or any MCP-compatible cl
 
 The ListBee MCP server exposes the ListBee API as tools any MCP-compatible AI client can call. Once configured, your AI assistant can create listings, check orders, and manage your account without leaving the conversation.
 
+| | |
+|---|---|
+| **Package** | `listbee-mcp` |
+| **Install** | `npx listbee-mcp` (no global install) |
+| **Auth** | `LISTBEE_API_KEY` environment variable |
+| **Source** | [github.com/listbee-dev/listbee](https://github.com/listbee-dev/listbee) |
+
 ---
 
 ## Install
@@ -136,6 +143,31 @@ export LISTBEE_API_KEY=lb_...
 ```
 
 Get your API key at [console.listbee.so](https://console.listbee.so).
+
+---
+
+## Common errors
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| `LISTBEE_API_KEY not set` | Environment variable missing from MCP config | Add `"LISTBEE_API_KEY": "lb_..."` to the `env` block in your MCP config |
+| `Could not connect to MCP server` | `npx` failed to fetch the package | Check internet connection; run `npx listbee-mcp` manually to diagnose |
+| `authentication_required` from tools | API key is invalid or expired | Verify the key starts with `lb_` and is active in [console.listbee.so](https://console.listbee.so) |
+| Tools not appearing in client | Config file not in the right location or malformed JSON | Check file path per platform table above; validate JSON syntax |
+
+## Limitations
+
+- **No webhook management** — the MCP server does not expose webhook CRUD. Use the API directly or the Python SDK.
+- **No account signup** — the server assumes an existing API key. Create accounts via the API.
+- **No Stripe connection** — connecting Stripe requires the API directly. Use `POST /v1/account/stripe-key`.
+- **Read-only orders** — you can list and get orders, but cannot create or modify them (orders are created by buyer checkout).
+
+---
+
+## Next steps
+
+- [Claude Code skill](/claude-code-skill) — an alternative integration for Claude Code that doesn't require MCP.
+- [Agent onboarding flow](/agent-onboarding) — the canonical pattern for agents selling on ListBee.
 
 ---
 

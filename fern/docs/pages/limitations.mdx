@@ -1,0 +1,71 @@
+---
+title: Limitations
+description: What ListBee does not support — boundaries to know before you build.
+---
+
+ListBee is focused on one-time digital content sales via API. This page documents what is explicitly outside that scope, so agents and developers can plan accordingly.
+
+---
+
+## Not supported
+
+| Limitation | Details |
+|-----------|---------|
+| **Physical goods** | Digital content only. No shipping, inventory, or fulfillment. |
+| **Subscriptions** | One-time purchases only. No recurring billing, trials, or plan management. |
+| **Multi-currency per listing** | Currency is set at the account level. All listings under an account use the same currency. |
+| **Custom checkout UI** | Checkout is hosted by ListBee on `buy.listbee.so`. No embeddable widgets or custom payment forms. |
+| **Refund API** | Refunds are processed through the Stripe dashboard directly. No ListBee API endpoint for refunds. |
+| **Content updates** | The `content` field is immutable after listing creation. To change content, delete the listing and create a new one. |
+| **Per-listing webhooks** | Webhooks are account-scoped. You cannot subscribe to events for a specific listing only. |
+| **Buyer accounts** | Buyers do not have accounts. They pay via Stripe Checkout and receive content by email. No buyer login or purchase history. |
+
+---
+
+## Platform limits
+
+| Resource | Limit |
+|----------|-------|
+| Listings per account | No hard limit |
+| Orders per month (Free plan) | 50 |
+| API keys per account | 10 |
+| Webhooks per account | 10 |
+| Metadata keys per listing | 50 |
+| Content file size | 100 MB |
+| Rate limits | See [Rate limits](/rate-limits) |
+
+---
+
+## Next steps
+
+- [FAQ](/faq) — common questions about ListBee.
+- [Errors](/errors) — understand error responses when you hit a boundary.
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — limitations
+#
+# NOT supported:
+#   - Physical goods (digital only)
+#   - Subscriptions / recurring billing (one-time purchases only)
+#   - Multi-currency per listing (currency is account-level)
+#   - Custom checkout UI (hosted on buy.listbee.so)
+#   - Refund API (use Stripe dashboard)
+#   - Content updates (immutable — delete and recreate)
+#   - Per-listing webhooks (account-scoped only)
+#   - Buyer accounts (no login, no purchase history)
+#
+# Platform limits:
+#   Orders/month (Free): 50
+#   API keys/account:    10
+#   Webhooks/account:    10
+#   Metadata keys:       50
+#   Content file size:   100 MB
+#
+# Docs: https://docs.listbee.so/limitations
+```
+</CodeBlock>

@@ -5,6 +5,12 @@ description: Teach Claude Code when and how to use ListBee by adding a skill fil
 
 A Claude Code skill is a Markdown file that tells Claude Code what a tool does, when to use it, and how to call it. When you add a ListBee skill to your project, Claude Code can create listings, check orders, and manage your account — without you having to explain the API each time.
 
+| | |
+|---|---|
+| **Skill location** | `.claude/skills/listbee/SKILL.md` (project) or `~/.claude/skills/listbee/SKILL.md` (global) |
+| **Auth** | `LISTBEE_API_KEY` environment variable |
+| **Triggers** | "sell something", "create a listing", "check orders", "update listing" |
+
 ---
 
 ## What a skill does
@@ -192,6 +198,30 @@ mkdir -p ~/.claude/skills/listbee
 ```
 
 Skills in `~/.claude/skills/` are loaded in all Claude Code sessions regardless of project.
+
+---
+
+## Common errors
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| Skill not triggering | Skill file not in `.claude/skills/` or wrong filename | Verify path is `.claude/skills/listbee/SKILL.md` (case-sensitive) |
+| `LISTBEE_API_KEY` not found | Environment variable not set in shell or `.env` | Add `export LISTBEE_API_KEY=lb_...` to shell profile or project `.env` |
+| `authentication_required` | API key is invalid | Verify the key starts with `lb_` and is active |
+| Claude uses generic HTTP instead of skill | Prompt didn't match skill trigger words | Use keywords like "listing", "sell", "product", or "order" |
+
+## Limitations
+
+- **No MCP tool calling** — the skill instructs Claude Code to run Python/httpx code directly. It does not use MCP tools.
+- **No webhook management** — the skill covers listings, orders, and account operations. Webhook CRUD is not included.
+- **Python-only examples** — the skill's code blocks use Python with httpx. Claude Code may adapt to TypeScript if asked, but the skill doesn't include TypeScript examples.
+
+---
+
+## Next steps
+
+- [MCP server](/mcp) — an alternative integration using MCP tools instead of a skill file.
+- [Python SDK](/python-sdk) — typed client with error handling, pagination, and async support.
 
 ---
 

@@ -5,6 +5,10 @@ description: How ListBee detects and handles different content payloads.
 
 The `content` field on a listing accepts a URL or plain text. ListBee automatically detects what kind of content it is and handles delivery accordingly.
 
+<Tip>
+ListBee detects content type automatically via a HEAD request to your URL. You don't need to specify the type explicitly in most cases.
+</Tip>
+
 ---
 
 ## Detection logic
@@ -118,6 +122,13 @@ This prevents accidental content swaps on live listings that have already been p
 | `file` | URL → file MIME type | Signed CDN download URL, expires 24h |
 | `url` | URL → HTML page | Redirect to your URL |
 | `text` | Non-URL string | Text shown inline in email |
+
+---
+
+## Next steps
+
+- [Listings](/listings) — create a listing with your content attached.
+- [Limitations](/limitations) — content is immutable after creation and capped at 100 MB for files.
 
 ---
 

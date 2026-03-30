@@ -5,6 +5,10 @@ description: Safely retry POST requests without creating duplicates.
 
 Send an `Idempotency-Key` header with any POST request. If you use the same key within 24 hours, ListBee returns the original cached response instead of executing the request again.
 
+<Note>
+Idempotency keys expire after 24 hours. After expiry, the same key is treated as a new request and will execute again.
+</Note>
+
 ```
 Idempotency-Key: <unique-string>
 ```
@@ -157,6 +161,13 @@ If you send the same key with a different request body, ListBee returns `409 Con
 ```
 
 This protects against accidentally reusing a key for a different operation.
+
+---
+
+## Next steps
+
+- [Rate limits](/rate-limits) — idempotent retries hit the cache, not the rate limiter.
+- [Errors](/errors) — handle `idempotency_conflict` (409) when keys are reused with different bodies.
 
 ---
 

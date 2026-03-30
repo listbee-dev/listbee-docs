@@ -163,6 +163,10 @@ export function handleWebhook(req: Request, res: Response) {
 
 </CodeGroup>
 
+<Warning>
+Always use timing-safe comparison for signature verification. Standard string equality (`==`) is vulnerable to timing attacks that can leak your webhook secret.
+</Warning>
+
 Always use a constant-time comparison function (`hmac.compare_digest` in Python, `timingSafeEqual` in Node.js) to prevent timing attacks.
 
 ---
@@ -215,6 +219,13 @@ console.log(result.status_code);  // HTTP status your endpoint returned
 ```
 
 </CodeGroup>
+
+---
+
+## Next steps
+
+- [Errors](/errors) — handle webhook delivery failures and error responses.
+- [Idempotency](/idempotency) — ensure your webhook handler processes events exactly once.
 
 ---
 

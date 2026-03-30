@@ -5,6 +5,15 @@ description: Typed Python client for the ListBee API — pip install listbee.
 
 The official Python SDK wraps the ListBee REST API with a typed, synchronous and async client. All endpoints are covered, errors raise typed exceptions, and pagination uses cursor iteration.
 
+| | |
+|---|---|
+| **Package** | `listbee` |
+| **Install** | `pip install listbee` |
+| **Min Python** | 3.9+ |
+| **Auth** | `ListBee(api_key="lb_...")` or `LISTBEE_API_KEY` env var |
+| **Source** | [github.com/listbee-dev/listbee-python](https://github.com/listbee-dev/listbee-python) |
+| **PyPI** | [pypi.org/project/listbee](https://pypi.org/project/listbee/) |
+
 ---
 
 ## Install
@@ -296,6 +305,32 @@ asyncio.run(main())
 ```
 
 All methods on `AsyncListBee` are `async` and return the same typed objects as the sync client.
+
+---
+
+## Common errors
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| `AuthenticationError` | API key missing, invalid, or revoked | Pass a valid `lb_...` key to `ListBee()` or set `LISTBEE_API_KEY` env var |
+| `NotFoundError` | Listing slug or order ID doesn't exist | Verify the slug/ID — listings use slug (`r7kq2xy9`), orders use ID (`ord_...`) |
+| `ValidationError` | Request body failed server-side validation | Check the `param` attribute on the error for the offending field |
+| `RateLimitError` | Too many requests | The SDK does not auto-retry on 429. Implement backoff using `retry_after` attribute |
+| `ImportError: No module named 'listbee'` | Package not installed | Run `pip install listbee` in the correct virtual environment |
+
+## Limitations
+
+- **No auto-retry** — the SDK raises on 429/5xx. Implement your own retry logic.
+- **No webhook signature verification** — use `hmac` directly as shown in the [Webhooks](/webhooks) guide.
+- **No file upload** — the `content` field accepts URLs, not file objects. Upload to your own storage first.
+- **Sync by default** — use `AsyncListBee` for async contexts. The sync and async clients have identical APIs.
+
+---
+
+## Next steps
+
+- [Quickstart](/quickstart) — use the SDK to go from zero to a live listing.
+- [Webhooks](/webhooks) — receive order notifications with signature verification.
 
 ---
 

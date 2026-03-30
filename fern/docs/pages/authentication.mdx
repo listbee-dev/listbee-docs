@@ -182,6 +182,10 @@ Rotate API keys without downtime:
 
 There is no grace period — the old key stops working as soon as it is deleted.
 
+<Tip>
+Create a new key before revoking the old one to avoid downtime. Both keys work simultaneously until you delete the old one.
+</Tip>
+
 ---
 
 ## Security
@@ -190,6 +194,13 @@ There is no grace period — the old key stops working as soon as it is deleted.
 - **Shown once.** The full key value is returned only in the `POST /v1/api-keys` response. After that, only the prefix (`lb_live_abc`) is visible in list responses.
 - **Prefix-only in list.** `GET /v1/api-keys` returns `prefix`, not `key`. Use the prefix to identify which key to rotate or delete.
 - **Treat keys as secrets.** Do not commit them to source control. Use environment variables or a secrets manager.
+
+---
+
+## Next steps
+
+- [Idempotency](/idempotency) — protect against duplicate requests with idempotency keys.
+- [Rate limits](/rate-limits) — understand per-endpoint rate limits for your API key.
 
 ---
 

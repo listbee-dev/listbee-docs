@@ -43,6 +43,10 @@ Content-Type: application/problem+json
 
 The `Retry-After` value is in seconds. Wait that long before retrying.
 
+<Warning>
+Respect the `Retry-After` header. Ignoring it and continuing to send requests may result in extended throttling.
+</Warning>
+
 ---
 
 ## Handling rate limits
@@ -99,6 +103,13 @@ print(listing["url"])
 - **Cache responses.** Listing and account data rarely change — cache `GET` responses for 30–60 seconds.
 - **Avoid polling tight loops.** When waiting for `readiness.operational`, use `time.sleep(5)` between polls, not `time.sleep(0.1)`.
 - **Use idempotency keys.** Retrying with the same `Idempotency-Key` hits the cache, not the rate limiter.
+
+---
+
+## Next steps
+
+- [Idempotency](/idempotency) — safe retries that don't count against rate limits.
+- [Errors](/errors) — full reference for `rate_limit_exceeded` and other error codes.
 
 ---
 

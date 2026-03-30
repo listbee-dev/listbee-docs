@@ -5,6 +5,14 @@ description: Use ListBee in n8n workflows with the official community node.
 
 The ListBee n8n community node lets you create listings, manage orders, and handle webhooks inside n8n workflows — no code required.
 
+| | |
+|---|---|
+| **Package** | `n8n-nodes-listbee` |
+| **Install** | Community nodes UI or `npm install n8n-nodes-listbee` |
+| **Auth** | ListBee API credential (`lb_...`) |
+| **Source** | [github.com/listbee-dev/n8n-nodes-listbee](https://github.com/listbee-dev/n8n-nodes-listbee) |
+| **npm** | [npmjs.com/package/n8n-nodes-listbee](https://www.npmjs.com/package/n8n-nodes-listbee) |
+
 ---
 
 ## Install
@@ -170,6 +178,31 @@ Slack — Send Message
   Message: "New order: {{ $json.body.data.object.buyer_email }} paid
             {{ $json.body.data.object.amount / 100 }} USD"
 ```
+
+---
+
+## Common errors
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| Node not appearing after install | n8n needs restart to load community nodes | Restart n8n after installing via Community Nodes UI |
+| `Authentication failed` | Credential has invalid or expired API key | Edit the ListBee credential in n8n and paste a valid `lb_...` key |
+| `404 Not Found` on listing operations | Wrong slug in the Slug field | Verify the slug matches — use the List Listings operation to find it |
+| Webhook trigger not firing | Webhook URL not registered with ListBee | Register the n8n webhook URL via `POST /v1/webhooks` with the n8n-provided URL |
+| `ECONNREFUSED` on self-hosted n8n | n8n webhook URL not reachable from internet | Use a tunnel (ngrok, Cloudflare Tunnel) or ensure n8n is publicly accessible |
+
+## Limitations
+
+- **No Stripe connection management** — connecting/disconnecting Stripe requires the API directly.
+- **No webhook CRUD in the node** — register webhooks via the API or HTTP Request node. The n8n node provides a Webhook Trigger for receiving events.
+- **No content type override** — the node passes content as-is. Auto-detection handles type. To override, use the HTTP Request node.
+
+---
+
+## Next steps
+
+- [Example: n8n workflow](/example-n8n) — a complete 4-node workflow that creates a listing and notifies Slack on sale.
+- [Webhooks](/webhooks) — set up webhook-triggered automations.
 
 ---
 

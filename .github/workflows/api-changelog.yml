@@ -1,0 +1,94 @@
+name: API Changelog Automation
+
+on:
+  pull_request:
+    paths:
+      - 'fern/openapi/**'
+  workflow_dispatch:
+
+jobs:
+  generate-diff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get base OpenAPI spec
+        run: |
+          git show ${{ github.event.pull_request.base.sha }}:fern/openapi/openapi.json > base-openapi.json || echo '{}' > base-openapi.json
+
+      - name: Copy current OpenAPI spec
+        run: |
+          cp fern/openapi/openapi.json current-openapi.json
+
+      - name: Run oasdiff changelog
+        id: oasdiff
+        uses: oasdiff/oasdiff-action/changelog@main
+        with:
+          base: base-openapi.json
+          revision: current-openapi.json
+          format: markdown
+          fail-on-diff: false
+        continue-on-error: true
+
+      - name: Check if changes detected
+        id: check_changes
+        env:
+          CHANGELOG: ${{ steps.oasdiff.outputs.changelog }}
+          BREAKING: ${{ steps.oasdiff.outputs.breaking }}
+        run: |
+          if [ -n "$CHANGELOG" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "breaking_count=${BREAKING:-0}" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "breaking_count=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload changelog diff artifact
+        if: steps.check_changes.outputs.has_changes == 'true'
+        env:
+          CHANGELOG_DIFF: ${{ steps.oasdiff.outputs.changelog }}
+        run: |
+          node -e "require('fs').writeFileSync('changelog-diff.md', process.env.CHANGELOG_DIFF || '')"
+
+      - name: Upload artifact
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-changelog-diff
+          path: changelog-diff.md
+          retention-days: 7
+
+      - name: Comment on PR with diff
+        if: steps.check_changes.outputs.has_changes == 'true' && github.event_name == 'pull_request'
+        env:
+          CHANGELOG_DIFF: ${{ steps.oasdiff.outputs.changelog }}
+          BREAKING_COUNT: ${{ steps.check_changes.outputs.breaking_count || 0 }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const diff = process.env.CHANGELOG_DIFF || '';
+            const breaking = (Number(process.env.BREAKING_COUNT) || 0) > 0;
+            const safeDiff = diff.replace(/\`\`\`/g, '\\`\\`\\`');
+            const body = [
+              `## ${breaking ? '🚨 Breaking' : '✨'} API Changes`,
+              '',
+              '```markdown',
+              safeDiff,
+              '```',
+              '',
+              '💡 Download `api-changelog-diff` artifact for the full diff.'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });

@@ -1,0 +1,62 @@
+paths:
+  /v1/webhooks/webhook_id/test:
+    post:
+      x-fern-examples:
+        - path-parameters:
+            webhook_id: webhook_id
+          response:
+            body:
+              object: webhook_test
+              success: true
+              status_code: 200
+              response_body: Webhook received successfully
+              error: null
+  /v1/account/stripe/connect:
+    post:
+      x-fern-examples:
+        - response:
+            body:
+              object: stripe_connect_session
+              url: https://connect.stripe.com/setup/s/acct_1Gqj58Lz0qyl6XeW
+              expires_at: '2024-07-01T12:00:00Z'
+  /v1/webhooks/webhook_id/events:
+    get:
+      x-fern-examples:
+        - path-parameters:
+            webhook_id: webhook_id
+          response:
+            body:
+              object: list
+              data:
+                - object: webhook_event
+                  id: evt_7kQ2xY9mN3pR5tW1
+                  event_type: order.completed
+                  status: delivered
+                  attempts: 1
+                  max_retries: 5
+                  response_status: 200
+                  last_error: null
+                  created_at: '2024-01-15T09:30:00Z'
+                  delivered_at: '2024-01-15T09:30:00Z'
+                - object: webhook_event
+                  id: evt_9mL4vZ7pQ2rT8xY3
+                  event_type: order.refunded
+                  status: failed
+                  attempts: 5
+                  max_retries: 5
+                  response_status: 500
+                  last_error: Internal Server Error
+                  created_at: '2024-01-14T16:45:00Z'
+                  delivered_at: null
+                - object: webhook_event
+                  id: evt_5nJ3wX8kR1sV6yZ2
+                  event_type: listing.created
+                  status: pending
+                  attempts: 2
+                  max_retries: 5
+                  response_status: null
+                  last_error: null
+                  created_at: '2024-01-16T11:20:00Z'
+                  delivered_at: null
+              cursor: evt_5nJ3wX8kR1sV6yZ2
+              has_more: true

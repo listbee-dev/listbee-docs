@@ -26,6 +26,7 @@ tabs:
   changelog:
     display-name: Changelog
     icon: clock
+    changelog: ./docs/changelog
 
 navigation:
   - tab: documentation
@@ -95,11 +96,7 @@ navigation:
             path: ./docs/pages/community.mdx
 
   - tab: api
-    slug: api-reference
     layout:
       - api: API Reference
 
   - tab: changelog
-    slug: changelog
-    layout:
-      - changelog: ./docs/changelog

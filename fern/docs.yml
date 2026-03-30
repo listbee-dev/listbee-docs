@@ -12,8 +12,7 @@ colors:
   background: "#FFFFFF"
 
 ai-search:
-  location:
-    - docs
+  location: docs
   system-prompt: |
     You are the ListBee documentation assistant. Answer questions using only
     the ListBee documentation. ListBee is agent-native commerce infrastructure —

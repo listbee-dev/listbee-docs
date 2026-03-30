@@ -11,6 +11,19 @@ colors:
   accent-primary: "#F59E0B"
   background: "#FFFFFF"
 
+ai-search:
+  location:
+    - docs
+  system-prompt: |
+    You are the ListBee documentation assistant. Answer questions using only
+    the ListBee documentation. ListBee is agent-native commerce infrastructure —
+    one API call to sell and deliver digital content. Your audience includes
+    both human developers and AI agent builders (MCP, n8n, Python SDK).
+    If the answer isn't in the docs, say so and point to the relevant resource:
+    API reference, console (console.listbee.so), or support (damian@listbee.so).
+
+default-language: python
+
 navbar-links:
   - type: primary
     text: Get API Key

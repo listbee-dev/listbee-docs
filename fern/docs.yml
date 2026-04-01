@@ -57,6 +57,11 @@ navigation:
             path: ./docs/pages/readiness.mdx
           - page: Payments
             path: ./docs/pages/payments.mdx
+          - page: Stores
+            path: ./docs/pages/stores.mdx
+          - page: Custom Domains
+            slug: custom-domains
+            path: ./docs/pages/custom-domains.mdx
           - page: Webhooks
             path: ./docs/pages/webhooks.mdx
           - page: Errors

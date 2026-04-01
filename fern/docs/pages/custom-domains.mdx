@@ -1,0 +1,184 @@
+---
+title: Custom domains
+description: Point your own domain to a ListBee store for branded product pages.
+---
+
+Each store can have a custom domain. When verified, product page URLs change from `buy.listbee.so/@{handle}/{slug}` to `https://{domain}/{slug}`.
+
+---
+
+## Setting a domain
+
+`PUT /v1/stores/{id}/domain` sets the custom domain for a store. The domain must be a bare hostname — no protocol prefix.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.put(
+    "https://api.listbee.so/v1/stores/str_.../domain",
+    headers={"Authorization": "Bearer lb_..."},
+    json={"domain": "fitness.com"},
+)
+domain = resp.json()
+
+print(domain["status"])        # pending
+print(domain["cname_target"])  # buy.listbee.so
+```
+
+```typescript title="TypeScript"
+const resp = await fetch("https://api.listbee.so/v1/stores/str_.../domain", {
+  method: "PUT",
+  headers: {
+    "Authorization": "Bearer lb_...",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ domain: "fitness.com" }),
+});
+const domain = await resp.json();
+
+console.log(domain.status);        // pending
+console.log(domain.cname_target);  // buy.listbee.so
+```
+
+</CodeGroup>
+
+The response is a domain object with `status: "pending"` and `cname_target: "buy.listbee.so"`. Point your DNS before calling verify.
+
+---
+
+## DNS setup
+
+Add a CNAME record pointing your domain to `buy.listbee.so`. This is required before verification succeeds.
+
+| Type | Name | Target |
+|------|------|--------|
+| CNAME | fitness.com | buy.listbee.so |
+
+<Note>
+Root domains (apex) may not support CNAME. Use a subdomain like `shop.fitness.com`, or check if your DNS provider supports CNAME flattening (Cloudflare, Route 53, and others do).
+</Note>
+
+DNS propagation typically takes a few minutes but can take up to 48 hours depending on your registrar.
+
+---
+
+## Verifying the domain
+
+`POST /v1/stores/{id}/domain/verify` checks whether the CNAME is in place and marks the domain active if it is.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/stores/str_.../domain/verify",
+    headers={"Authorization": "Bearer lb_..."},
+)
+domain = resp.json()
+
+print(domain["status"])  # verified — domain is active
+```
+
+```typescript title="TypeScript"
+const resp = await fetch("https://api.listbee.so/v1/stores/str_.../domain/verify", {
+  method: "POST",
+  headers: { "Authorization": "Bearer lb_..." },
+});
+const domain = await resp.json();
+
+console.log(domain.status);  // verified — domain is active
+```
+
+</CodeGroup>
+
+Status values after verification:
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | DNS not yet propagated — call verify again after DNS updates |
+| `verified` | CNAME confirmed; domain is active and product pages use it |
+| `stale` | 72-hour auto-check window expired; call verify again to restart |
+
+---
+
+## Removing a domain
+
+`DELETE /v1/stores/{id}/domain` removes the custom domain. Product page URLs revert to `buy.listbee.so/@{handle}/{slug}` immediately.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.delete(
+    "https://api.listbee.so/v1/stores/str_.../domain",
+    headers={"Authorization": "Bearer lb_..."},
+)
+# 204 No Content on success
+```
+
+```typescript title="TypeScript"
+const resp = await fetch("https://api.listbee.so/v1/stores/str_.../domain", {
+  method: "DELETE",
+  headers: { "Authorization": "Bearer lb_..." },
+});
+// 204 No Content on success
+```
+
+</CodeGroup>
+
+---
+
+## How URLs change
+
+| Setup | Product page URL |
+|-------|-----------------|
+| No custom domain | `buy.listbee.so/@handle/slug` |
+| Custom domain (verified) | `https://fitness.com/slug` |
+
+The `url` field on listing objects updates automatically once the domain is verified — no listing changes needed.
+
+---
+
+## Next steps
+
+- [Stores](/stores) — manage your stores
+- [Listings](/listings) — create products
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — custom domains API
+#
+# Each store can have one custom domain. When verified, listing URLs change to https://{domain}/{slug}.
+# Requires a CNAME record pointing the domain to buy.listbee.so.
+#
+# Set domain:
+#   PUT /v1/stores/{id}/domain  { "domain": "fitness.com" }
+#   → domain object: { status: "pending", cname_target: "buy.listbee.so" }
+#
+# Verify domain (call after DNS is in place):
+#   POST /v1/stores/{id}/domain/verify
+#   → domain object with updated status:
+#       "pending"  — DNS not yet propagated
+#       "verified" — CNAME confirmed, domain active
+#       "stale"    — 72h window expired, call verify to restart
+#
+# Remove domain:
+#   DELETE /v1/stores/{id}/domain  → 204
+#   (Listing URLs revert to buy.listbee.so/@handle/slug immediately)
+#
+# DNS record required:
+#   CNAME  your-domain.com  buy.listbee.so
+#   Use a subdomain if apex CNAME not supported; check for CNAME flattening.
+#
+# Auth: Authorization: Bearer lb_...
+# Errors: RFC 9457 { type, title, status, detail, code, param }
+```
+</CodeBlock>

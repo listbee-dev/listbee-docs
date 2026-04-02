@@ -87,7 +87,7 @@ resp = httpx.post(
     json={
         "name": "<product name>",
         "price": <price in cents>,
-        "content": "<URL or text payload>",
+        "deliverable": "<URL or text payload>",
     },
 )
 listing = resp.json()
@@ -165,7 +165,7 @@ Common status codes: 401 (invalid key), 404 (not found), 422 (validation error),
 
 - Price is always in cents: $19.00 = `1900`
 - Listings are looked up by `slug`, not `id`
-- `content` can be a URL (file delivered to buyer) or raw text
+- `deliverable` can be a URL (file delivered to buyer) or raw text
 - `listing.url` is the product page — share it with buyers
 - ID prefixes: `lst_` listing, `ord_` order, `acc_` account
 ````

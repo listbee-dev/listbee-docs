@@ -56,7 +56,7 @@ const client = new ListBee(); // reads LISTBEE_API_KEY from environment
 const listing = await client.listings.create({
   name: "Python Async Patterns",
   price: 1900,          // cents — $19.00
-  content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+  deliverable: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
 });
 
 console.log(listing.url);               // https://buy.listbee.so/python-async-patterns
@@ -69,7 +69,7 @@ Optional fields:
 const listing = await client.listings.create({
   name: "SQL Performance Guide",
   price: 2900,
-  content: "https://my-bucket.s3.amazonaws.com/sql-guide.pdf",
+  deliverable: "https://my-bucket.s3.amazonaws.com/sql-guide.pdf",
   description: "50 query patterns for high-traffic Postgres databases.",
   slug: "sql-performance-guide",  // auto-generated if omitted
 });
@@ -427,7 +427,7 @@ while (true) {
 //   const client = new ListBee({ apiKey: "lb_..." });  // or LISTBEE_API_KEY env var
 //
 // Methods:
-//   client.listings.create({ name, price, content, ...opts })   → ListingResponse
+//   client.listings.create({ name, price, deliverable, ...opts })   → ListingResponse
 //   client.listings.list({ cursor?, limit? })                    → CursorPage<ListingResponse>
 //   client.listings.get(slug)                                    → ListingResponse
 //   client.listings.update(slug, { ...fields })                  → ListingResponse

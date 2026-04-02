@@ -73,7 +73,7 @@ idempotency_key = str(uuid.uuid4())
 payload = {
     "name": "Python Async Patterns",
     "price": 1900,
-    "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+    "deliverable": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
 }
 
 # Retry up to 3 times with the same idempotency key
@@ -110,7 +110,7 @@ const idempotencyKey = randomUUID();
 const payload = {
   name: "Python Async Patterns",
   price: 1900,
-  content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+  deliverable: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
 };
 
 // Retry up to 3 times with the same idempotency key

@@ -137,7 +137,7 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,      # $19.00
-        "content": "https://alex-bucket.s3.amazonaws.com/python-async.pdf",
+        "deliverable": "https://alex-bucket.s3.amazonaws.com/python-async.pdf",
     },
 )
 listing = resp.json()
@@ -246,7 +246,7 @@ def create_listing(api_key: str, name: str, price_cents: int, content_url: str) 
         json={
             "name": name,
             "price": price_cents,
-            "content": content_url,
+            "deliverable": content_url,
         },
     ).json()
 
@@ -295,7 +295,7 @@ else:
 #    next == "connect_stripe" (kind: human) → POST /v1/account/stripe/connect → send URL to user
 #
 # 3. Create listing with idempotency key
-#    POST /v1/listings  { name, price (cents), content (URL or text) }
+#    POST /v1/listings  { name, price (cents), deliverable (URL or text) }
 #    Header: Idempotency-Key: <uuid>
 #    → listing.url (share with buyers)
 #    → listing.readiness.sellable: true when buyers can purchase

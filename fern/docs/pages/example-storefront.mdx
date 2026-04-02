@@ -16,17 +16,17 @@ Create a `catalog.json` file with your listings:
   {
     "name": "Python Async Patterns",
     "price": 1900,
-    "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf"
+    "deliverable": "https://my-bucket.s3.amazonaws.com/python-async.pdf"
   },
   {
     "name": "FastAPI Production Guide",
     "price": 2900,
-    "content": "https://my-bucket.s3.amazonaws.com/fastapi-guide.pdf"
+    "deliverable": "https://my-bucket.s3.amazonaws.com/fastapi-guide.pdf"
   },
   {
     "name": "SQL for Data Scientists",
     "price": 1500,
-    "content": "https://my-bucket.s3.amazonaws.com/sql-datascience.pdf"
+    "deliverable": "https://my-bucket.s3.amazonaws.com/sql-datascience.pdf"
   }
 ]
 ```
@@ -259,7 +259,7 @@ Watching for orders (polling every 30s)... Ctrl+C to stop.
 # ListBee — bulk listing creation + order polling
 #
 # Create listings from JSON array:
-#   POST /v1/listings  { name, price (cents), content }
+#   POST /v1/listings  { name, price (cents), deliverable }
 #   Use Idempotency-Key header per request (uuid4)
 #   Response: { id, slug, url, readiness: { sellable, actions, next } }
 #

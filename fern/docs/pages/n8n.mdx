@@ -84,7 +84,7 @@ Add a **ListBee** node to your workflow and configure it as follows:
 | Operation | Create |
 | Name | `My Product` (or expression from previous node) |
 | Price | `1900` (cents — $19.00) |
-| Content | `https://my-bucket.s3.amazonaws.com/file.pdf` |
+| Deliverable | `https://my-bucket.s3.amazonaws.com/file.pdf` |
 
 The node outputs the full listing object. Use `{{ $json.url }}` in downstream nodes to access the checkout URL.
 
@@ -133,7 +133,7 @@ If you need an operation not covered by the community node, use the **HTTP Reque
 | Header Auth Name | `Authorization` |
 | Header Auth Value | `Bearer lb_...` |
 | Body Content Type | JSON |
-| Body | `{ "name": "My Product", "price": 1900, "content": "https://..." }` |
+| Body | `{ "name": "My Product", "price": 1900, "deliverable": "https://..." }` |
 
 ---
 
@@ -195,7 +195,7 @@ Slack — Send Message
 
 - **No Stripe connection management** — connecting/disconnecting Stripe requires the API directly.
 - **No webhook CRUD in the node** — register webhooks via the API or HTTP Request node. The n8n node provides a Webhook Trigger for receiving events.
-- **No content type override** — the node passes content as-is. Auto-detection handles type. To override, use the HTTP Request node.
+- **No deliverable type override** — the node passes the deliverable as-is. Auto-detection handles type. To override, use the HTTP Request node.
 
 ---
 
@@ -220,7 +220,7 @@ Slack — Send Message
 # Node operations:
 #
 #   Listing / Create:
-#     name (str), price (int, cents), content (str)
+#     name (str), price (int, cents), deliverable (str)
 #     optional: description, slug
 #     output: listing object — use {{ $json.url }} for checkout URL
 #
@@ -239,7 +239,7 @@ Slack — Send Message
 #   URL:         https://api.listbee.so/v1/listings
 #   Auth:        Header Auth — Authorization: Bearer lb_...
 #   Body type:   JSON
-#   Body:        { "name": "...", "price": 1900, "content": "..." }
+#   Body:        { "name": "...", "price": 1900, "deliverable": "..." }
 #
 # Webhook trigger:
 #   Register: POST /v1/webhooks { "url": "...", "events": ["order.paid"] }

@@ -118,7 +118,7 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,
-        "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+        "deliverable": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
         "utm_source": "newsletter",
         "utm_medium": "email",
         "utm_campaign": "march-2026-launch",
@@ -139,7 +139,7 @@ const client = new ListBee({ apiKey: "lb_..." });
 const listing = await client.listings.create({
   name: "Python Async Patterns",
   price: 1900,
-  content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+  deliverable: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
   utm_source: "newsletter",
   utm_medium: "email",
   utm_campaign: "march-2026-launch",
@@ -167,7 +167,7 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,
-        "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+        "deliverable": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
     },
 )
 listing = resp.json()
@@ -186,7 +186,7 @@ const client = new ListBee({ apiKey: "lb_..." });
 const listing = await client.listings.create({
   name: "Python Async Patterns",
   price: 1900,
-  content: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+  deliverable: "https://my-bucket.s3.amazonaws.com/python-async.pdf",
 });
 
 // UTM fields are null — defaults apply at render time

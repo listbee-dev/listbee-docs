@@ -3,7 +3,7 @@ title: Deliverables
 description: How ListBee detects and delivers digital content — files, URLs, and text.
 ---
 
-A deliverable is the digital content attached to a listing. ListBee detects the type from what you pass to the `content` field and handles delivery automatically when using [managed fulfillment](/fulfillment-modes).
+A deliverable is the digital content attached to a listing. ListBee detects the type from what you pass to the `deliverable` field and handles delivery automatically when using [managed fulfillment](/fulfillment-modes).
 
 Deliverables are one axis of the fulfillment model. The other is the [fulfillment mode](/fulfillment-modes) (managed vs external).
 
@@ -17,7 +17,7 @@ Deliverables are one axis of the fulfillment model. The other is the [fulfillmen
 
 ## Detection logic
 
-When you set `content`, ListBee inspects the value:
+When you set `deliverable`, ListBee inspects the value:
 
 1. If the value is not a URL → **TEXT**
 2. If the value is a URL → ListBee sends a `HEAD` request
@@ -51,7 +51,7 @@ resp = httpx.post(
     json={
         "name": "Advanced Python Patterns",
         "price": 2900,
-        "content": "https://my-bucket.s3.amazonaws.com/advanced-python.pdf",
+        "deliverable": "https://my-bucket.s3.amazonaws.com/advanced-python.pdf",
     },
 )
 listing = resp.json()
@@ -68,7 +68,7 @@ const client = new ListBee({ apiKey: "lb_..." });
 const listing = await client.listings.create({
   name: "Advanced Python Patterns",
   price: 2900,
-  content: "https://my-bucket.s3.amazonaws.com/advanced-python.pdf",
+  deliverable: "https://my-bucket.s3.amazonaws.com/advanced-python.pdf",
 });
 
 console.log(listing.deliverable_type);  // file
@@ -98,7 +98,7 @@ resp = httpx.post(
     json={
         "name": "Private Research Notes",
         "price": 1500,
-        "content": "https://www.notion.so/your-page-id",
+        "deliverable": "https://www.notion.so/your-page-id",
     },
 )
 listing = resp.json()
@@ -113,7 +113,7 @@ const client = new ListBee({ apiKey: "lb_..." });
 const listing = await client.listings.create({
   name: "Private Research Notes",
   price: 1500,
-  content: "https://www.notion.so/your-page-id",
+  deliverable: "https://www.notion.so/your-page-id",
 });
 console.log(listing.deliverable_type);  // url
 ```
@@ -139,7 +139,7 @@ resp = httpx.post(
     json={
         "name": "Premium API Access",
         "price": 4900,
-        "content": "LICENSE-KEY-ABCD-1234-EFGH-5678",
+        "deliverable": "LICENSE-KEY-ABCD-1234-EFGH-5678",
     },
 )
 listing = resp.json()
@@ -154,7 +154,7 @@ const client = new ListBee({ apiKey: "lb_..." });
 const listing = await client.listings.create({
   name: "Premium API Access",
   price: 4900,
-  content: "LICENSE-KEY-ABCD-1234-EFGH-5678",
+  deliverable: "LICENSE-KEY-ABCD-1234-EFGH-5678",
 });
 console.log(listing.deliverable_type);  // text
 ```
@@ -165,7 +165,7 @@ console.log(listing.deliverable_type);  // text
 
 ## No deliverable (external only)
 
-External fulfillment listings don't need a deliverable. Set `fulfillment: "external"` without `content` — your app handles all delivery.
+External fulfillment listings don't need a deliverable. Set `fulfillment: "external"` without `deliverable` — your app handles all delivery.
 
 ```python
 import httpx
@@ -177,7 +177,7 @@ resp = httpx.post(
         "name": "Custom Portrait Drawing",
         "price": 4900,
         "fulfillment": "external",
-        # no content — deliverable_type will be null
+        # no deliverable — deliverable_type will be null
     },
 )
 listing = resp.json()
@@ -199,25 +199,25 @@ The `content_type` field has been renamed to `deliverable_type`. Similarly:
 | `content_meta` | `deliverable_meta` |
 | `has_content` | `has_deliverable` |
 
-The `content` field on create/update requests is unchanged — you still pass content the same way.
+The create/update field is now `deliverable` (renamed from `content`).
 
 ---
 
 ## Summary
 
-| Type | `content` value | After purchase (managed) |
+| Type | `deliverable` value | After purchase (managed) |
 |------|----------------|--------------------------|
 | `file` | URL → file MIME type | Signed CDN download URL, expires 24h |
 | `url` | URL → HTML page | Redirect to your URL |
 | `text` | Non-URL string | Text shown inline in email |
-| `null` | No content (external only) | Your app delivers |
+| `null` | No deliverable (external only) | Your app delivers |
 
 ---
 
 ## Next steps
 
 - [Fulfillment modes](/fulfillment-modes) — managed vs external delivery.
-- [Listings](/listings) — create a listing with content attached.
+- [Listings](/listings) — create a listing with a deliverable attached.
 - [Limitations](/limitations) — files capped at 100 MB.
 
 ---
@@ -228,13 +228,13 @@ The `content` field on create/update requests is unchanged — you still pass co
 ```python
 # ListBee — deliverables (formerly content types)
 #
-# The `content` field accepts a URL or plain text. Detection is automatic.
+# The `deliverable` field accepts a URL or plain text. Detection is automatic.
 #
 # deliverable_type values:
 #   "file" — URL resolves to file MIME type → CDN-hosted, signed download URL (24h)
 #   "url"  — URL resolves to text/html → redirect after purchase
 #   "text" — non-URL string → inline text in buyer email
-#   null   — no content (external fulfillment only)
+#   null   — no deliverable (external fulfillment only)
 #
 # Two-axis model:
 #   deliverable_type (file/url/text/null) × fulfillment (managed/external)

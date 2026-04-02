@@ -118,7 +118,7 @@ Two required fields: `name` and `price` (in cents). What you add beyond that det
 
 ### Simple: managed fulfillment (digital content)
 
-Pass `content` — ListBee delivers it automatically after payment.
+Pass `deliverable` — ListBee delivers it automatically after payment.
 
 <CodeGroup>
 
@@ -134,7 +134,7 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,      # $19.00 in cents
-        "content": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+        "deliverable": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
     },
 )
 listing = resp.json()
@@ -152,7 +152,7 @@ const client = new ListBee({ apiKey: "lb_..." }); // from step 1
 const listing = await client.listings.create({
   name: "Python Async Patterns",
   price: 1900,     // $19.00 in cents
-  content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+  deliverable: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
 });
 
 console.log(listing.url);                    // https://buy.listbee.so/r7kq2xy9
@@ -243,7 +243,7 @@ If `sellable` is `false`, check `readiness.actions` — each action has a `code`
     Managed vs external — understand both delivery paths.
   </Card>
   <Card title="Listings" href="/listings">
-    Update content, pricing, cover images. Manage listing status.
+    Update deliverables, pricing, cover images. Manage listing status.
   </Card>
   <Card title="Readiness system" href="/readiness">
     How agents read and act on readiness signals.
@@ -277,7 +277,7 @@ If `sellable` is `false`, check `readiness.actions` — each action has a `code`
 #     → 200 account object with readiness.operational: true
 #
 # Step 3a: Managed listing (digital content — ListBee delivers)
-#   POST /v1/listings  { "name", "price" (cents), "content" }
+#   POST /v1/listings  { "name", "price" (cents), "deliverable" }
 #     → 201 { fulfillment: "managed", deliverable_type: "file"|"url"|"text", ... }
 #
 # Step 3b: External listing (your app delivers)

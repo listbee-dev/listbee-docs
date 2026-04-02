@@ -3,7 +3,7 @@ title: Listings
 description: Create and manage priced products with hosted product pages — digital downloads, physical goods, or custom services.
 ---
 
-A listing is a priced product with a hosted product page. Create one with a name, price, and optional content — ListBee generates a URL you can share with buyers.
+A listing is a priced product with a hosted product page. Create one with a name, price, and optional deliverable — ListBee generates a URL you can share with buyers.
 
 Each listing has a `readiness.sellable` flag. When `true`, buyers can purchase immediately. When `false`, `readiness.actions` tells you exactly what to fix. See the [Readiness system](/readiness) for full details.
 
@@ -15,7 +15,7 @@ Each listing has a `readiness.sellable` flag. When `true`, buyers can purchase i
 
 ### Managed fulfillment (digital content)
 
-Pass `content` — a URL pointing to a file, a redirect URL, or a plain-text string. ListBee detects the deliverable type and handles delivery automatically.
+Pass `deliverable` — a URL pointing to a file, a redirect URL, or a plain-text string. ListBee detects the deliverable type and handles delivery automatically.
 
 <CodeGroup>
 
@@ -28,7 +28,7 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,      # $19.00 in cents
-        "content": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+        "deliverable": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
     },
 )
 listing = resp.json()
@@ -47,7 +47,7 @@ const client = new ListBee({ apiKey: "lb_..." });
 const listing = await client.listings.create({
   name: "Python Async Patterns",
   price: 1900,     // $19.00 in cents
-  content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+  deliverable: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
 });
 
 console.log(listing.url);                   // https://buy.listbee.so/r7kq2xy9
@@ -60,7 +60,7 @@ console.log(listing.readiness.sellable);    // true
 
 ### External fulfillment (your app delivers)
 
-Set `fulfillment: "external"` — no content needed. Add a `checkout_schema` to collect buyer information (address, preferences, etc.).
+Set `fulfillment: "external"` — no deliverable needed. Add a `checkout_schema` to collect buyer information (address, preferences, etc.).
 
 <CodeGroup>
 
@@ -115,14 +115,14 @@ For multi-store accounts, pass `store_id` to assign the listing to a specific st
 
 ## Deliverable types
 
-ListBee detects deliverable type from the `content` field:
+ListBee detects deliverable type from the `deliverable` field:
 
 | Type | What you provide | What happens (managed) |
 |------|-----------------|----------------------|
 | `FILE` | A URL ending in a file extension (`.pdf`, `.zip`, etc.) | File fetched and hosted on CDN. Buyers receive a signed URL. |
 | `URL` | Any other URL | After payment, buyers are redirected to the URL. |
 | `TEXT` | A plain string (no `http://` prefix) | Inline content delivered in the order confirmation. |
-| `null` | No content (external fulfillment) | Your app handles delivery. |
+| `null` | No deliverable (external fulfillment) | Your app handles delivery. |
 
 See [Deliverables](/deliverables) for edge cases and the full detection logic.
 
@@ -132,7 +132,7 @@ See [Deliverables](/deliverables) for edge cases and the full detection logic.
 
 `PUT /v1/listings/{slug}` accepts any subset of fields. Only the fields you send are changed.
 
-Content is immutable after creation — to change what buyers receive, delete the listing and create a new one. Fulfillment mode and checkout schema can be updated.
+The deliverable is immutable after creation — to change what buyers receive, delete the listing and create a new one. Fulfillment mode and checkout schema can be updated.
 
 <CodeGroup>
 
@@ -250,7 +250,7 @@ DELETE /v1/listings/{slug}
 # Listings looked up by slug, not ID.
 #
 # Create (managed — digital content):
-#   POST /v1/listings  { name, price, content: "https://..." }
+#   POST /v1/listings  { name, price, deliverable: "https://..." }
 #   → fulfillment: "managed", deliverable_type: "file"|"url"|"text"
 #
 # Create (external — your app delivers):
@@ -260,7 +260,7 @@ DELETE /v1/listings/{slug}
 # Checkout schema fields: { key, type: "text"|"select"|"date"|"address", label, required, options? }
 #   Max 10 fields. Address stored in order.shipping_address, others in checkout_data.
 #
-# Update (partial, content immutable):
+# Update (partial, deliverable immutable):
 #   PUT /v1/listings/{slug}  { any subset of fields }
 #
 # Delete:

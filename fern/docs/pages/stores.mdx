@@ -247,7 +247,7 @@ resp = httpx.post(
     json={
         "name": "30-Day Strength Program",
         "price": 2900,
-        "content": "https://your-bucket.s3.amazonaws.com/strength-program.pdf",
+        "deliverable": "https://your-bucket.s3.amazonaws.com/strength-program.pdf",
         "store_id": "str_...",  # assign to specific store
     },
 )
@@ -265,7 +265,7 @@ const resp = await fetch("https://api.listbee.so/v1/listings", {
   body: JSON.stringify({
     name: "30-Day Strength Program",
     price: 2900,
-    content: "https://your-bucket.s3.amazonaws.com/strength-program.pdf",
+    deliverable: "https://your-bucket.s3.amazonaws.com/strength-program.pdf",
     store_id: "str_...",  // assign to specific store
   }),
 });

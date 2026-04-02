@@ -208,7 +208,7 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,
-        "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+        "deliverable": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
     },
 )
 listing = resp.json()
@@ -340,7 +340,7 @@ listing = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,
-        "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
+        "deliverable": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
     },
 ).json()
 
@@ -387,7 +387,7 @@ print(f"Fulfillment: {listing['fulfillment']}")
 #   GET /v1/account → account.readiness.operational: true
 #
 # STEP 7a: Managed listing (digital content)
-#   POST /v1/listings  { name, price, content }
+#   POST /v1/listings  { name, price, deliverable }
 #   → fulfillment: "managed", readiness.sellable: true
 #
 # STEP 7b: External listing (your app delivers)

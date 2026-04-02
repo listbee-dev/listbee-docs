@@ -7,7 +7,7 @@ ListBee is a REST API for creating and selling digital content. The primary reso
 
 ## Create a listing
 
-Two required fields: `name` and `price`. Add `content` and the listing can sell immediately. Currency is determined by your account settings.
+Two required fields: `name` and `price`. Add `deliverable` and the listing can sell immediately. Currency is determined by your account settings.
 
 <CodeGroup>
 
@@ -19,7 +19,7 @@ client = ListBee(api_key="lb_...")
 listing = client.listings.create(
     name="Python Async Patterns",
     price=1900,        # cents
-    content="https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+    deliverable="https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
 )
 
 print(listing.url)        # https://buy.listbee.so/r7kq2xy9
@@ -34,7 +34,7 @@ const client = new ListBee({ apiKey: "lb_..." });
 const listing = await client.listings.create({
   name: "Python Async Patterns",
   price: 1900,        // cents
-  content: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
+  deliverable: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
 });
 
 console.log(listing.url);               // https://buy.listbee.so/r7kq2xy9
@@ -114,7 +114,7 @@ Agents never touch payment data. Humans never interact with the API.
 #   1. POST /v1/account/signup    { email }                  → OTP sent
 #   2. POST /v1/account/verify    { email, code }            → api_key
 #   3. POST /v1/account/stripe-key { secret_key }            → account.readiness.operational
-#   4. POST /v1/listings          { name, price, content } → listing.url + readiness.sellable
+#   4. POST /v1/listings          { name, price, deliverable } → listing.url + readiness.sellable
 #
 # Listing response includes:
 #   - url:                product page URL (share with buyers)

@@ -24,8 +24,8 @@ resp = httpx.post(
     json={
         "name": "Python Async Patterns",
         "price": 1900,
-        "content": "https://your-bucket.s3.amazonaws.com/python-async.pdf",
-        # fulfillment defaults to "managed" when content is provided
+        "deliverable": "https://your-bucket.s3.amazonaws.com/python-async.pdf",
+        # fulfillment defaults to "managed" when deliverable is provided
     },
 )
 listing = resp.json()
@@ -42,8 +42,8 @@ const client = new ListBee({ apiKey: "lb_..." });
 const listing = await client.listings.create({
   name: "Python Async Patterns",
   price: 1900,
-  content: "https://your-bucket.s3.amazonaws.com/python-async.pdf",
-  // fulfillment defaults to "managed" when content is provided
+  deliverable: "https://your-bucket.s3.amazonaws.com/python-async.pdf",
+  // fulfillment defaults to "managed" when deliverable is provided
 });
 
 console.log(listing.fulfillment);       // managed
@@ -82,7 +82,7 @@ resp = httpx.post(
         "name": "Custom Portrait Drawing",
         "price": 4900,
         "fulfillment": "external",
-        # no content — your app delivers after payment
+        # no deliverable — your app delivers after payment
     },
 )
 listing = resp.json()
@@ -100,7 +100,7 @@ const listing = await client.listings.create({
   name: "Custom Portrait Drawing",
   price: 4900,
   fulfillment: "external",
-  // no content — your app delivers after payment
+  // no deliverable — your app delivers after payment
 });
 
 console.log(listing.fulfillment);       // external
@@ -129,7 +129,7 @@ External fulfillment requires a registered webhook. If no webhook is configured,
 
 ```
 Do you have a file, URL, or text to deliver automatically?
-  → Yes: use managed fulfillment (default when content is provided)
+  → Yes: use managed fulfillment (default when deliverable is provided)
   → No: use external fulfillment
 
 Is delivery handled by your own code or a third party?
@@ -164,9 +164,9 @@ ListBee infers the fulfillment mode when you don't set it explicitly:
 
 | You provide | Inferred `fulfillment` |
 |------------|----------------------|
-| `content` (file/URL/text) | `"managed"` |
-| No `content` | `"external"` |
-| `fulfillment: "external"` + `content` | `"external"` (content ignored for delivery, stored as metadata) |
+| `deliverable` (file/URL/text) | `"managed"` |
+| No `deliverable` | `"external"` |
+| `fulfillment: "external"` + `deliverable` | `"external"` (deliverable ignored for delivery, stored as metadata) |
 
 ---
 
@@ -220,19 +220,19 @@ console.log(listing.fulfillment);  // external
 #
 # Every listing has fulfillment: "managed" | "external"
 #
-# MANAGED (default when content is provided):
+# MANAGED (default when deliverable is provided):
 #   ListBee delivers automatically — file download, URL redirect, or inline text.
 #   Order flow: PENDING → PAID → FULFILLED (all automatic)
 #   Events: order.paid + order.fulfilled both fire
 #
-# EXTERNAL (default when no content):
+# EXTERNAL (default when no deliverable):
 #   ListBee collects payment, fires order.paid webhook, your app delivers.
 #   Order flow: PENDING → PAID (automatic) → FULFILLED (via POST /v1/orders/{id}/fulfill)
 #   Requires: registered webhook endpoint
 #   Events: order.paid fires on payment, order.fulfilled fires after you call fulfill
 #
 # Create managed listing:
-#   POST /v1/listings { name, price, content: "https://..." }
+#   POST /v1/listings { name, price, deliverable: "https://..." }
 #   → fulfillment: "managed", deliverable_type: "file"
 #
 # Create external listing:

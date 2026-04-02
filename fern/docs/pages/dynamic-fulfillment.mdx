@@ -127,19 +127,20 @@ async def handle_webhook(request: Request):
     event = await request.json()
 
     if event["type"] == "order.paid":
-        order = event["data"]["object"]
-        birth_date = order["checkout_data"]["birth_date"]
-        focus = order["checkout_data"].get("zodiac_focus", "General")
+        data = event["data"]
 
-        # Generate the horoscope (your AI logic here)
-        horoscope = generate_horoscope(birth_date, focus)
+        # Everything needed is in the webhook — no API call required
+        horoscope = generate_horoscope(
+            birth_date=data["checkout_data"]["birth_date"],
+            focus=data["checkout_data"].get("zodiac_focus", "General"),
+        )
 
         # Push generated content to ListBee for delivery
-        lb.orders.fulfill(order["id"], deliverable=horoscope)
+        lb.orders.fulfill(data["order_id"], deliverable=horoscope)
 
     return {"ok": True}
 
-def generate_horoscope(birth_date: str, focus: str) -> str:
+def generate_horoscope(birth_date: str, focus: str = "General") -> str:
     # Your AI generation logic
     return f"Your personalized {focus.lower()} horoscope for {birth_date}..."
 ```
@@ -170,15 +171,16 @@ export async function handleWebhook(req: Request, res: Response) {
   const event = JSON.parse(payload.toString());
 
   if (event.type === "order.paid") {
-    const order = event.data.object;
-    const birthDate = order.checkout_data.birth_date;
-    const focus = order.checkout_data.zodiac_focus ?? "General";
+    const data = event.data;
 
-    // Generate the horoscope (your AI logic here)
-    const horoscope = generateHoroscope(birthDate, focus);
+    // Everything needed is in the webhook — no API call required
+    const horoscope = generateHoroscope(
+      data.checkout_data.birth_date,
+      data.checkout_data.zodiac_focus ?? "General",
+    );
 
     // Push generated content to ListBee for delivery
-    await client.orders.fulfill(order.id, { deliverable: horoscope });
+    await client.orders.fulfill(data.order_id, { deliverable: horoscope });
   }
 
   res.json({ ok: true });

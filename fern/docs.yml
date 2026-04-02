@@ -52,6 +52,12 @@ navigation:
           - page: Orders & Delivery
             slug: orders
             path: ./docs/pages/orders.mdx
+          - page: Fulfillment Modes
+            slug: fulfillment-modes
+            path: ./docs/pages/fulfillment-modes.mdx
+          - page: Deliverables
+            slug: deliverables
+            path: ./docs/pages/deliverables.mdx
           - page: Readiness System
             slug: readiness
             path: ./docs/pages/readiness.mdx
@@ -99,8 +105,15 @@ navigation:
             path: ./docs/pages/idempotency.mdx
           - page: Rate Limits
             path: ./docs/pages/rate-limits.mdx
-          - page: Content Types
-            path: ./docs/pages/content-types.mdx
+          - page: Checkout Schema
+            slug: checkout-schema
+            path: ./docs/pages/checkout-schema.mdx
+          - page: Selling Physical Products
+            slug: physical-products
+            path: ./docs/pages/physical-products.mdx
+          - page: Dynamic Fulfillment
+            slug: dynamic-fulfillment
+            path: ./docs/pages/dynamic-fulfillment.mdx
           - page: Google Analytics tracking
             slug: analytics
             path: ./docs/pages/analytics.mdx

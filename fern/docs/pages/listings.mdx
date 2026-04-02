@@ -1,9 +1,9 @@
 ---
 title: Listings
-description: Create and manage priced digital content with hosted product pages.
+description: Create and manage priced products with hosted product pages — digital downloads, physical goods, or custom services.
 ---
 
-A listing is a priced digital product with a hosted product page. Create one with a name, price, and content — ListBee generates a URL you can share directly with buyers.
+A listing is a priced product with a hosted product page. Create one with a name, price, and optional content — ListBee generates a URL you can share with buyers.
 
 Each listing has a `readiness.sellable` flag. When `true`, buyers can purchase immediately. When `false`, `readiness.actions` tells you exactly what to fix. See the [Readiness system](/readiness) for full details.
 
@@ -11,7 +11,11 @@ Each listing has a `readiness.sellable` flag. When `true`, buyers can purchase i
 
 ## Create a listing
 
-`POST /v1/listings` requires `name`, `price` (in cents), and `content`. Currency is determined by your account settings. The `content` field accepts a URL pointing to a file, a redirect URL, or a plain-text string — ListBee detects the type automatically.
+`POST /v1/listings` requires `name` and `price` (in cents). Currency is determined by your account settings.
+
+### Managed fulfillment (digital content)
+
+Pass `content` — a URL pointing to a file, a redirect URL, or a plain-text string. ListBee detects the deliverable type and handles delivery automatically.
 
 <CodeGroup>
 
@@ -30,8 +34,9 @@ resp = httpx.post(
 listing = resp.json()
 
 print(listing["url"])                    # https://buy.listbee.so/r7kq2xy9
-print(listing["slug"])                   # r7kq2xy9
-print(listing["readiness"]["sellable"])  # True — buyers can purchase now
+print(listing["fulfillment"])            # managed
+print(listing["deliverable_type"])       # file
+print(listing["readiness"]["sellable"])  # True
 ```
 
 ```typescript title="TypeScript"
@@ -46,29 +51,80 @@ const listing = await client.listings.create({
 });
 
 console.log(listing.url);                   // https://buy.listbee.so/r7kq2xy9
-console.log(listing.slug);                  // r7kq2xy9
-console.log(listing.readiness.sellable);    // true — buyers can purchase now
+console.log(listing.fulfillment);           // managed
+console.log(listing.deliverable_type);      // file
+console.log(listing.readiness.sellable);    // true
 ```
 
 </CodeGroup>
 
-The response is a listing object. The `url` field is the product page — ready to share.
+### External fulfillment (your app delivers)
 
-For multi-store accounts, pass `store_id` to assign the listing to a specific store. Single-store accounts can omit it — the listing is automatically assigned to the default store.
+Set `fulfillment: "external"` — no content needed. Add a `checkout_schema` to collect buyer information (address, preferences, etc.).
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "name": "Handmade Leather Boots",
+        "price": 18900,
+        "fulfillment": "external",
+        "checkout_schema": [
+            {"key": "size", "type": "select", "label": "Shoe size", "required": True, "options": ["EU 38", "EU 39", "EU 40", "EU 41", "EU 42"]},
+            {"key": "shipping_address", "type": "address", "label": "Shipping address", "required": True},
+        ],
+    },
+)
+listing = resp.json()
+
+print(listing["fulfillment"])            # external
+print(listing["deliverable_type"])       # None
+print(listing["readiness"]["sellable"])  # True (if webhook configured)
+```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.create({
+  name: "Handmade Leather Boots",
+  price: 18900,
+  fulfillment: "external",
+  checkoutSchema: [
+    { key: "size", type: "select", label: "Shoe size", required: true, options: ["EU 38", "EU 39", "EU 40", "EU 41", "EU 42"] },
+    { key: "shipping_address", type: "address", label: "Shipping address", required: true },
+  ],
+});
+
+console.log(listing.fulfillment);           // external
+console.log(listing.deliverable_type);      // null
+console.log(listing.readiness.sellable);    // true (if webhook configured)
+```
+
+</CodeGroup>
+
+For multi-store accounts, pass `store_id` to assign the listing to a specific store. Single-store accounts can omit it.
 
 ---
 
-## Content types
+## Deliverable types
 
-ListBee detects content type from what you pass to the `content` field:
+ListBee detects deliverable type from the `content` field:
 
-| Type | What you provide | What happens |
-|------|-----------------|--------------|
-| `FILE` | A URL ending in a file extension (`.pdf`, `.zip`, etc.) | File fetched and hosted on ListBee's CDN. Buyers receive a time-limited signed URL. |
+| Type | What you provide | What happens (managed) |
+|------|-----------------|----------------------|
+| `FILE` | A URL ending in a file extension (`.pdf`, `.zip`, etc.) | File fetched and hosted on CDN. Buyers receive a signed URL. |
 | `URL` | Any other URL | After payment, buyers are redirected to the URL. |
-| `TEXT` | A plain string (no `http://` prefix) | Inline content delivered directly in the order confirmation. |
+| `TEXT` | A plain string (no `http://` prefix) | Inline content delivered in the order confirmation. |
+| `null` | No content (external fulfillment) | Your app handles delivery. |
 
-Auto-detection handles most cases. See [Content types](/content-types) for edge cases and explicit type overrides.
+See [Deliverables](/deliverables) for edge cases and the full detection logic.
 
 ---
 
@@ -76,7 +132,7 @@ Auto-detection handles most cases. See [Content types](/content-types) for edge 
 
 `PUT /v1/listings/{slug}` accepts any subset of fields. Only the fields you send are changed.
 
-Content is immutable after creation — to change what buyers receive, delete the listing and create a new one.
+Content is immutable after creation — to change what buyers receive, delete the listing and create a new one. Fulfillment mode and checkout schema can be updated.
 
 <CodeGroup>
 
@@ -113,7 +169,7 @@ console.log(listing.price);    // 2500
 
 ## Delete a listing
 
-`DELETE /v1/listings/{slug}` removes the listing and its product page. If the content type was `FILE`, the file is also removed from the CDN.
+`DELETE /v1/listings/{slug}` removes the listing and its product page. If the deliverable type was `FILE`, the file is also removed from the CDN.
 
 <CodeGroup>
 
@@ -145,7 +201,10 @@ await client.listings.delete("r7kq2xy9");
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string | Listing title shown on the product page. |
-| `price` | integer | Price in smallest currency unit (cents for USD). Currency is set at the account level. |
+| `price` | integer | Price in smallest currency unit (cents for USD). |
+| `fulfillment` | string | `"managed"` or `"external"`. |
+| `deliverable_type` | string \| null | `"file"`, `"url"`, `"text"`, or `null`. |
+| `checkout_schema` | array \| null | Custom fields collected at checkout. Max 10. |
 | `description` | string | Full description. Markdown supported. |
 | `tagline` | string | Short one-line pitch shown under the title. |
 | `highlights` | string[] | Bullet points displayed prominently on the page. |
@@ -153,7 +212,7 @@ await client.listings.delete("r7kq2xy9");
 | `cover_url` | string | URL of the cover image shown on the product page. |
 | `metadata` | object | Key-value store for your own data. Up to 50 keys. |
 | `badges` | string[] | Small labels displayed on the listing (e.g. `"New"`, `"Bestseller"`). |
-| `rating` | number | Display rating (0–5). Does not affect functionality. |
+| `rating` | number | Display rating (0-5). Does not affect functionality. |
 | `reviews` | integer | Display review count. Does not affect functionality. |
 | `faqs` | object[] | FAQ items with `question` and `answer` fields. |
 
@@ -161,7 +220,7 @@ await client.listings.delete("r7kq2xy9");
 
 ## Slug-based lookup
 
-Listings are fetched by slug, not ID. The slug is derived from the listing name at creation time and cannot be changed. Use it in all endpoints:
+Listings are fetched by slug, not ID. The slug is derived from the listing name at creation time and cannot be changed.
 
 ```
 GET  /v1/listings/{slug}
@@ -169,14 +228,14 @@ PUT  /v1/listings/{slug}
 DELETE /v1/listings/{slug}
 ```
 
-If you need the slug after creation, it's in the `slug` field of the listing object.
-
 ---
 
 ## Next steps
 
+- [Fulfillment modes](/fulfillment-modes) — managed vs external, when to use each.
 - [Orders & Delivery](/orders) — what happens after a buyer pays.
-- [Content types](/content-types) — how auto-detection works and when to override it.
+- [Deliverables](/deliverables) — how auto-detection works and edge cases.
+- [Checkout schema](/checkout-schema) — collect custom data from buyers.
 
 ---
 
@@ -186,35 +245,29 @@ If you need the slug after creation, it's in the `slug` field of the listing obj
 ```python
 # ListBee — listings API
 #
-# A listing = priced digital content + hosted product page.
-# All prices are in smallest currency unit (cents for USD). Currency is set at the account level.
-# Listings are looked up by slug, not ID.
+# A listing = priced product + hosted product page.
+# All prices in cents. Currency set at account level.
+# Listings looked up by slug, not ID.
 #
-# Create:
-#   POST /v1/listings
-#   Body: { "name": str, "price": int, "content": str }
-#   → 201 listing object with:
-#       id:        "lst_r7kq2xy9m3pR5tW1"
-#       slug:      "r7kq2xy9"
-#       url:       "https://buy.listbee.so/r7kq2xy9"
-#       readiness: { "sellable": bool, "actions": [...], "next": str | null }
+# Create (managed — digital content):
+#   POST /v1/listings  { name, price, content: "https://..." }
+#   → fulfillment: "managed", deliverable_type: "file"|"url"|"text"
 #
-# Content type auto-detection:
-#   URL ending in .pdf/.zip/etc  → FILE  (fetched to CDN, signed URL delivery)
-#   Any other URL                → URL   (redirect after payment)
-#   Plain string (no http://)    → TEXT  (inline delivery)
+# Create (external — your app delivers):
+#   POST /v1/listings  { name, price, fulfillment: "external", checkout_schema?: [...] }
+#   → fulfillment: "external", deliverable_type: null
+#
+# Checkout schema fields: { key, type: "text"|"select"|"date"|"address", label, required, options? }
+#   Max 10 fields. Address stored in order.shipping_address, others in checkout_data.
 #
 # Update (partial, content immutable):
 #   PUT /v1/listings/{slug}  { any subset of fields }
 #
-# Delete (removes CDN file if FILE type):
+# Delete:
 #   DELETE /v1/listings/{slug}  → 204
 #
-# Get:
-#   GET /v1/listings/{slug}
-#
-# List:
-#   GET /v1/listings?limit=20&cursor=...
+# Get:     GET /v1/listings/{slug}
+# List:    GET /v1/listings?limit=20&cursor=...
 #
 # Auth: Authorization: Bearer lb_...
 # Errors: RFC 9457 { type, title, status, detail, code, param }

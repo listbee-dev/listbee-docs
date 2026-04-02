@@ -3,7 +3,7 @@ title: Agent onboarding flow
 description: Complete walkthrough of an agent guiding a human from zero to a live listing — every API call, every human interaction, in order.
 ---
 
-This page shows the full lifecycle: account creation, email verification, Stripe setup, listing creation, and sharing the checkout URL. Each step shows the agent–human conversation alongside the API call that drives it.
+This page shows the full lifecycle: account creation, email verification, Stripe setup, listing creation, and sharing the checkout URL. Each step shows the agent-human conversation alongside the API call that drives it.
 
 This is the canonical pattern for an agent operating ListBee on behalf of a human.
 
@@ -189,7 +189,9 @@ Once `operational` is `true`, the account can process payments.
 
 ## Step 7: Create the listing
 
-The agent collects the listing details from the human — or generates them from context — and calls `POST /v1/listings`.
+The agent collects listing details from the human — or generates them from context. Two paths depending on the product type.
+
+### Path A: Digital product (managed fulfillment)
 
 **Agent says:**
 > What would you like to sell? Give me a name, price, and the file or URL you want to deliver to buyers.
@@ -205,27 +207,78 @@ resp = httpx.post(
     headers={"Authorization": f"Bearer {api_key}"},
     json={
         "name": "Python Async Patterns",
-        "price": 1900,          # cents
+        "price": 1900,
         "content": "https://my-bucket.s3.amazonaws.com/python-async.pdf",
     },
 )
 listing = resp.json()
 
 print(listing["url"])                   # https://buy.listbee.so/r7kq2xy9
+print(listing["fulfillment"])           # managed
 print(listing["readiness"]["sellable"]) # True
 ```
 
-The `url` field is the product page. When `readiness.sellable` is `true`, buyers can purchase immediately.
+### Path B: Physical product or custom service (external fulfillment)
+
+**Agent says:**
+> What would you like to sell? I'll set it up so you get notified when someone pays, and you handle delivery.
+
+**Human says:**
+> Custom portrait drawings — $49. I need to know their preferred art style.
+
+**Agent calls:**
+
+```python
+# First, register a webhook to receive orders
+httpx.post(
+    f"{BASE}/v1/webhooks",
+    headers={"Authorization": f"Bearer {api_key}"},
+    json={
+        "url": "https://yourapp.com/webhooks/listbee",
+        "events": ["order.paid"],
+    },
+)
+
+# Then create the listing
+resp = httpx.post(
+    f"{BASE}/v1/listings",
+    headers={"Authorization": f"Bearer {api_key}"},
+    json={
+        "name": "Custom Portrait Drawing",
+        "price": 4900,
+        "fulfillment": "external",
+        "checkout_schema": [
+            {"key": "style", "type": "select", "label": "Art style", "required": True, "options": ["Watercolor", "Pencil", "Digital"]},
+            {"key": "description", "type": "text", "label": "Describe what you want", "required": True},
+        ],
+    },
+)
+listing = resp.json()
+
+print(listing["url"])                   # https://buy.listbee.so/custom-portrait
+print(listing["fulfillment"])           # external
+print(listing["readiness"]["sellable"]) # True
+```
 
 ---
 
 ## Step 8: Share the checkout URL
+
+### Managed listing
 
 **Agent says:**
 > Your listing is live. Share this URL with buyers:
 > https://buy.listbee.so/r7kq2xy9
 >
 > When someone pays, they receive the PDF automatically by email.
+
+### External listing
+
+**Agent says:**
+> Your listing is live. Share this URL with buyers:
+> https://buy.listbee.so/custom-portrait
+>
+> When someone pays, you'll receive a webhook with their order details and art style preference. Fulfill the order and call the fulfill endpoint when done.
 
 ---
 
@@ -280,7 +333,7 @@ if not account["readiness"]["operational"]:
             break
         time.sleep(5)
 
-# Step 7: Create listing
+# Step 7: Create listing (managed example)
 listing = httpx.post(
     f"{BASE}/v1/listings",
     headers=headers,
@@ -293,12 +346,14 @@ listing = httpx.post(
 
 # Step 8: Share URL
 print(f"Your listing is live: {listing['url']}")
+print(f"Fulfillment: {listing['fulfillment']}")
 ```
 
 ---
 
 ## Next steps
 
+- [Fulfillment modes](/fulfillment-modes) — managed vs external, decision tree.
 - [MCP server](/mcp) — give your agent ListBee tools directly via MCP.
 - [Readiness system](/readiness) — deep dive into how readiness actions work.
 
@@ -311,13 +366,12 @@ print(f"Your listing is live: {listing['url']}")
 #
 # STEP 1: Request OTP (no auth required)
 #   POST /v1/account/signup   { "email": "..." }
-#   → 200 { object, email, status, message }
 #
 # STEP 2: Human provides 6-digit code from inbox
 #
 # STEP 3: Verify — get API key
 #   POST /v1/account/verify   { "email": "...", "code": "123456" }
-#   → 201 { object, api_key: "lb_...", account: { id, readiness, ... } }
+#   → { api_key: "lb_...", account: { id, readiness } }
 #
 # STEP 4: Check account readiness
 #   account.readiness.operational: false → Stripe not connected
@@ -325,30 +379,24 @@ print(f"Your listing is live: {listing['url']}")
 #
 # STEP 5a: Human has Stripe key → agent submits it
 #   POST /v1/account/stripe-key   { "secret_key": "sk_live_..." }
-#   Auth: Bearer lb_...
-#   → 200 account object with readiness.operational: true
 #
 # STEP 5b: Human needs Stripe Connect
-#   POST /v1/account/stripe/connect
-#   Auth: Bearer lb_...
-#   → 200 { url: "https://connect.stripe.com/..." }
-#   Agent sends URL to human → human completes in browser
+#   POST /v1/account/stripe/connect → { url: "https://connect.stripe.com/..." }
 #
 # STEP 6: Poll until operational
-#   GET /v1/account
-#   Auth: Bearer lb_...
-#   → account.readiness.operational: true when ready
+#   GET /v1/account → account.readiness.operational: true
 #
-# STEP 7: Create listing
-#   POST /v1/listings  { "name", "price" (cents), "content" (URL or text) }
-#   Auth: Bearer lb_...
-#   → 201 { object, id, slug, url, readiness: { sellable, actions, next }, ... }
+# STEP 7a: Managed listing (digital content)
+#   POST /v1/listings  { name, price, content }
+#   → fulfillment: "managed", readiness.sellable: true
+#
+# STEP 7b: External listing (your app delivers)
+#   POST /v1/webhooks  { url, events: ["order.paid"] }
+#   POST /v1/listings  { name, price, fulfillment: "external", checkout_schema?: [...] }
+#   → fulfillment: "external"
 #
 # STEP 8: Share listing.url with human
-#   listing.url = "https://buy.listbee.so/{slug}"
-#   listing.readiness.sellable: true → buyers can purchase
 #
 # Auth: Authorization: Bearer lb_...
-# Errors: RFC 9457 { type, title, status, detail, code, param }
 # Docs: https://docs.listbee.so
 ```

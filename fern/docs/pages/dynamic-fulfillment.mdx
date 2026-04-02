@@ -1,0 +1,280 @@
+---
+title: Dynamic fulfillment
+description: Generate content after payment and push it to ListBee for delivery — AI agents, on-demand services, custom generation.
+---
+
+Dynamic fulfillment bridges external and managed delivery. Your app receives the `order.paid` webhook, generates content (AI output, custom report, personalized file), then calls `POST /v1/orders/{id}/fulfill` to push it back to ListBee. ListBee delivers the generated content to the buyer.
+
+---
+
+## How it works
+
+1. Create a listing with `fulfillment: "external"`.
+2. Buyer pays. ListBee fires `order.paid` webhook.
+3. Your app generates content based on the order (buyer email, checkout data, etc.).
+4. Your app calls `POST /v1/orders/{id}/fulfill` with the generated content.
+5. ListBee creates an access grant and delivers it to the buyer by email.
+6. ListBee fires `order.fulfilled` webhook.
+
+The buyer gets the same delivery experience as managed fulfillment — email with download link, redirect, or inline text — but the content was generated on-demand by your code.
+
+---
+
+## Walkthrough: AI horoscope agent
+
+An AI agent sells personalized daily horoscopes. The buyer provides their birth date at checkout. After payment, the agent generates a horoscope and pushes it back to ListBee.
+
+### Step 1: Create the listing
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "name": "Personalized AI Horoscope",
+        "price": 500,
+        "fulfillment": "external",
+        "checkout_schema": [
+            {
+                "key": "birth_date",
+                "type": "date",
+                "label": "Your birth date",
+                "required": True,
+            },
+            {
+                "key": "zodiac_focus",
+                "type": "select",
+                "label": "Reading focus",
+                "required": False,
+                "options": ["Career", "Love", "Health", "General"],
+            },
+        ],
+    },
+)
+listing = resp.json()
+print(listing["url"])  # https://buy.listbee.so/ai-horoscope
+```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.create({
+  name: "Personalized AI Horoscope",
+  price: 500,
+  fulfillment: "external",
+  checkoutSchema: [
+    {
+      key: "birth_date",
+      type: "date",
+      label: "Your birth date",
+      required: true,
+    },
+    {
+      key: "zodiac_focus",
+      type: "select",
+      label: "Reading focus",
+      required: false,
+      options: ["Career", "Love", "Health", "General"],
+    },
+  ],
+});
+console.log(listing.url);  // https://buy.listbee.so/ai-horoscope
+```
+
+</CodeGroup>
+
+### Step 2: Handle the webhook and generate content
+
+<CodeGroup>
+
+```python title="Python"
+import hashlib
+import hmac
+import httpx
+from fastapi import Request
+
+WEBHOOK_SECRET = "whsec_..."
+API_KEY = "lb_..."
+
+async def handle_webhook(request: Request):
+    payload = await request.body()
+    signature = request.headers.get("X-ListBee-Signature")
+
+    expected = hmac.new(WEBHOOK_SECRET.encode(), payload, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return {"error": "Invalid signature"}, 400
+
+    event = await request.json()
+
+    if event["type"] == "order.paid":
+        order = event["data"]["object"]
+        birth_date = order["checkout_data"]["birth_date"]
+        focus = order["checkout_data"].get("zodiac_focus", "General")
+
+        # Generate the horoscope (your AI logic here)
+        horoscope = generate_horoscope(birth_date, focus)
+
+        # Push generated content back to ListBee
+        httpx.post(
+            f"https://api.listbee.so/v1/orders/{order['id']}/fulfill",
+            headers={"Authorization": f"Bearer {API_KEY}"},
+            json={"content": horoscope},
+        )
+
+    return {"ok": True}
+
+def generate_horoscope(birth_date: str, focus: str) -> str:
+    # Your AI generation logic
+    return f"Your personalized {focus.lower()} horoscope for {birth_date}..."
+```
+
+```typescript title="TypeScript"
+import { createHmac, timingSafeEqual } from "crypto";
+import { ListBee } from "listbee";
+import type { Request, Response } from "express";
+
+const WEBHOOK_SECRET = "whsec_...";
+const client = new ListBee({ apiKey: "lb_..." });
+
+export async function handleWebhook(req: Request, res: Response) {
+  const payload = req.body as Buffer;
+  const signature = req.headers["x-listbee-signature"] as string;
+
+  const expected = createHmac("sha256", WEBHOOK_SECRET)
+    .update(payload)
+    .digest("hex");
+
+  const sigBuf = Buffer.from(signature, "hex");
+  const expBuf = Buffer.from(expected, "hex");
+
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+    return res.status(400).json({ error: "Invalid signature" });
+  }
+
+  const event = JSON.parse(payload.toString());
+
+  if (event.type === "order.paid") {
+    const order = event.data.object;
+    const birthDate = order.checkout_data.birth_date;
+    const focus = order.checkout_data.zodiac_focus ?? "General";
+
+    // Generate the horoscope (your AI logic here)
+    const horoscope = generateHoroscope(birthDate, focus);
+
+    // Push generated content back to ListBee
+    await client.orders.fulfill(order.id, { content: horoscope });
+  }
+
+  res.json({ ok: true });
+}
+
+function generateHoroscope(birthDate: string, focus: string): string {
+  // Your AI generation logic
+  return `Your personalized ${focus.toLowerCase()} horoscope for ${birthDate}...`;
+}
+```
+
+</CodeGroup>
+
+### Step 3: Buyer receives the content
+
+After your `fulfill` call, ListBee delivers the generated text to the buyer by email — the same way managed fulfillment works. The buyer doesn't know (or care) that it was generated on-demand.
+
+---
+
+## The fulfill endpoint
+
+`POST /v1/orders/{id}/fulfill` accepts generated content in three forms:
+
+| Field | Type | What it does |
+|-------|------|-------------|
+| `content` | string | Plain text delivered inline (like TEXT deliverable) |
+| `content_url` | string | URL to a file or page (ListBee detects FILE vs URL) |
+| `content_type` | string | Override auto-detection: `"file"`, `"url"`, or `"text"` |
+
+<CodeGroup>
+
+```python title="Python — text content"
+import httpx
+
+# Deliver generated text
+httpx.post(
+    "https://api.listbee.so/v1/orders/ord_abc123/fulfill",
+    headers={"Authorization": "Bearer lb_..."},
+    json={"content": "Your personalized horoscope: Mercury is in retrograde..."},
+)
+```
+
+```python title="Python — file content"
+import httpx
+
+# Deliver a generated file
+httpx.post(
+    "https://api.listbee.so/v1/orders/ord_abc123/fulfill",
+    headers={"Authorization": "Bearer lb_..."},
+    json={"content_url": "https://your-bucket.s3.amazonaws.com/generated-report.pdf"},
+)
+```
+
+</CodeGroup>
+
+---
+
+## Use cases
+
+| Use case | Checkout schema | After payment |
+|----------|----------------|---------------|
+| AI horoscope | `birth_date` (date), `zodiac_focus` (select) | Generate text, call fulfill with `content` |
+| Custom avatar | `style` (select), `description` (text) | Generate image, upload to S3, call fulfill with `content_url` |
+| Personalized report | `company_name` (text), `industry` (select) | Generate PDF, call fulfill with `content_url` |
+| On-demand code review | `repo_url` (text) | Analyze repo, call fulfill with `content` (markdown) |
+
+---
+
+## Next steps
+
+- [Fulfillment modes](/fulfillment-modes) — understand managed vs external.
+- [Checkout schema](/checkout-schema) — collect buyer input at checkout.
+- [Webhooks](/webhooks) — handle `order.paid` and `order.fulfilled` events.
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — dynamic fulfillment (AI-generated content)
+#
+# Pattern: external fulfillment + fulfill callback
+#
+# 1. Create listing:
+#    POST /v1/listings {
+#      name, price, fulfillment: "external",
+#      checkout_schema: [{ key, type, label, required }]
+#    }
+#
+# 2. Receive order.paid webhook:
+#    event.data.object.checkout_data = { birth_date: "1990-05-15", ... }
+#    event.data.object.buyer_email = "buyer@example.com"
+#
+# 3. Generate content (your AI/logic)
+#
+# 4. Push to ListBee:
+#    POST /v1/orders/{id}/fulfill {
+#      content: "text content"          ← inline text delivery
+#      content_url: "https://..."       ← file or URL delivery
+#      content_type: "file"|"url"|"text" ← optional override
+#    }
+#    → ListBee creates access grant, delivers to buyer by email
+#    → fires order.fulfilled webhook
+#
+# Auth: Authorization: Bearer lb_...
+# Docs: https://docs.listbee.so/dynamic-fulfillment
+```
+</CodeBlock>

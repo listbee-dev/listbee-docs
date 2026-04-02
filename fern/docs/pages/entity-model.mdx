@@ -11,15 +11,17 @@ ListBee has six core entities. This page shows how they relate and where to find
 
 ```
 Account
-├── Listing
-│   ├── Order
-│   │   └── Access Grant
-│   └── Content (file / url / text)
+├── Store
+│   └── Listing
+│       ├── Order
+│       │   └── Access Grant
+│       ├── Deliverable (file / url / text / none)
+│       └── Checkout Schema (text / select / date / address fields)
 ├── Webhook
 └── API Key
 ```
 
-An **account** owns everything. **Listings** are the products you sell. When a buyer pays, an **order** is created and an **access grant** delivers the content. **Webhooks** notify you of events. **API keys** authenticate your requests.
+An **account** owns everything. **Stores** group listings under a shared Stripe connection. **Listings** are the products you sell — each has a **fulfillment mode** (managed or external) and an optional **deliverable** (the digital content ListBee can deliver). When a buyer pays, an **order** is created. For managed fulfillment, an **access grant** delivers the content. **Webhooks** notify you of events. **API keys** authenticate your requests.
 
 ---
 
@@ -27,9 +29,10 @@ An **account** owns everything. **Listings** are the products you sell. When a b
 
 | Entity | ID prefix | Description | Docs |
 |--------|-----------|-------------|------|
-| Account | `acc_` | Your seller account. Owns all resources. One Stripe connection per account. | [Authentication](/authentication) |
-| Listing | `lst_` | A priced digital product with a hosted product page. Looked up by slug, not ID. | [Listings](/listings) |
-| Order | `ord_` | Created when a buyer completes payment. Read-only — you cannot create orders via API. | [Orders & Delivery](/orders) |
+| Account | `acc_` | Your seller account. Owns all resources. | [Authentication](/authentication) |
+| Store | `str_` | Groups listings under a shared Stripe connection. One default store per account. | [Stores](/stores) |
+| Listing | `lst_` | A priced product with a hosted product page. Has a fulfillment mode and optional deliverable. Looked up by slug, not ID. | [Listings](/listings) |
+| Order | `ord_` | Created when a buyer completes payment. Tracks status, checkout data, shipping, and fulfillment. | [Orders & Delivery](/orders) |
 | Access Grant | `ag_` | Controls content delivery after payment. Internal — not exposed in the API. | [Orders & Delivery](/orders) |
 | Webhook | `wh_` | An HTTP endpoint that receives event notifications. | [Webhooks](/webhooks) |
 | API Key | `lbk_` | Authentication credential. Key value has `lb_` prefix; entity ID has `lbk_` prefix. | [Authentication](/authentication) |
@@ -37,12 +40,41 @@ An **account** owns everything. **Listings** are the products you sell. When a b
 
 ---
 
+## Listing fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `fulfillment` | `"managed"` \| `"external"` | Who delivers the product. Managed = ListBee. External = your app. |
+| `deliverable_type` | `"file"` \| `"url"` \| `"text"` \| `null` | Type of digital content attached (null for external without content). |
+| `checkout_schema` | array \| null | Custom fields collected from buyer at checkout. Max 10. |
+| `has_deliverable` | boolean | Whether the listing has digital content attached. |
+
+---
+
+## Order fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | `pending`, `paid`, `fulfilled`, `canceled`, `failed` |
+| `checkout_data` | object \| null | Buyer responses from checkout schema fields |
+| `shipping_address` | object \| null | Structured address: `{ line1, line2, city, state, postal_code, country }` |
+| `fulfillment_status` | string \| null | `pending`, `shipped`, `fulfilled` (external orders only) |
+| `carrier` | string \| null | Shipping carrier name |
+| `tracking_code` | string \| null | Tracking number |
+| `seller_note` | string \| null | Note from seller to buyer |
+| `paid_at` | datetime \| null | When payment was confirmed |
+| `fulfilled_at` | datetime \| null | When order was marked fulfilled |
+
+---
+
 ## Relationships
 
-- An account has many listings, webhooks, and API keys.
+- An account has many stores, webhooks, and API keys.
+- A store has many listings. Each listing belongs to one store.
 - A listing has many orders. Each order belongs to exactly one listing.
-- An order has one access grant (created automatically on payment).
-- A listing has one content payload (file, URL, or text). Content is immutable after creation.
+- An order has one access grant (created automatically on payment for managed fulfillment).
+- A listing has one optional deliverable (file, URL, or text). Content is immutable after creation.
+- A listing has an optional checkout schema (custom fields collected at checkout).
 - Webhooks receive events for all resources under the account — there is no per-listing webhook scoping.
 
 ---
@@ -53,6 +85,7 @@ All IDs follow the pattern `{prefix}_{random}`. The prefix tells you the entity 
 
 ```
 acc_r7kq2xy9m3pR5tW1   → Account
+str_r7kq2xy9m3pR5tW1   → Store
 lst_r7kq2xy9m3pR5tW1   → Listing
 ord_r7kq2xy9m3pR5tW1   → Order
 ag_r7kq2xy9m3pR5tW1    → Access Grant
@@ -67,6 +100,7 @@ evt_r7kq2xy9m3pR5tW1   → Event
 ## Next steps
 
 - [Listings](/listings) — create and manage your first product.
+- [Fulfillment modes](/fulfillment-modes) — managed vs external delivery.
 - [Readiness system](/readiness) — understand when a listing is ready to sell.
 
 ---
@@ -77,12 +111,14 @@ evt_r7kq2xy9m3pR5tW1   → Event
 ```python
 # ListBee — entity model
 #
-# Hierarchy: Account → Listing → Order → Access Grant
-#                        └→ Content (file/url/text)
+# Hierarchy: Account → Store → Listing → Order → Access Grant
+#                                 ├→ Deliverable (file/url/text/null)
+#                                 └→ Checkout Schema (text/select/date/address)
 #            Account → Webhook, API Key
 #
 # ID prefixes:
 #   acc_  account
+#   str_  store
 #   lst_  listing (looked up by slug, not ID)
 #   ord_  order
 #   ag_   access grant (internal, not in API responses)
@@ -91,12 +127,18 @@ evt_r7kq2xy9m3pR5tW1   → Event
 #   lb_   API key value (used in Authorization: Bearer lb_...)
 #   evt_  event (webhook payload)
 #
-# Key relationships:
-#   account has many: listings, webhooks, api_keys
-#   listing has many: orders
-#   listing has one: content (immutable)
-#   order has one: access_grant (auto-created on payment)
-#   webhooks are account-scoped (receive all events, no per-listing filter)
+# Listing key fields:
+#   fulfillment: "managed" | "external"
+#   deliverable_type: "file" | "url" | "text" | null
+#   checkout_schema: [{ key, type, label, required, options? }] | null
+#
+# Order key fields:
+#   status: pending | paid | fulfilled | canceled | failed
+#   checkout_data: { key: value } | null
+#   shipping_address: { line1, line2, city, state, postal_code, country } | null
+#   fulfillment_status: pending | shipped | fulfilled | null
+#   carrier, tracking_code, seller_note: string | null
+#   paid_at, fulfilled_at: datetime | null
 #
 # Docs: https://docs.listbee.so/entity-model
 ```

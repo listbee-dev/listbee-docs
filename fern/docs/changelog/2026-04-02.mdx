@@ -1,0 +1,55 @@
+---
+title: "Fulfillment architecture"
+date: 2026-04-02
+tags: ["api", "webhooks", "new-feature", "breaking-change"]
+---
+
+ListBee now supports two fulfillment modes on every listing: **managed** (ListBee delivers digital content automatically) and **external** (your app handles delivery via webhooks). Sell physical goods, AI-generated content, custom services — anything that needs logic after payment.
+
+## What changed
+
+- **New:** `fulfillment` field on listings — `"managed"` or `"external"`. Defaults inferred from whether `content` is provided.
+- **New:** `checkout_schema` on listings — collect custom fields from buyers at checkout (text, select, date, address). Max 10 fields.
+- **New:** `POST /v1/orders/{id}/fulfill` — push generated content or mark external orders as fulfilled.
+- **New:** `POST /v1/orders/{id}/ship` — record shipping carrier, tracking code, and seller note.
+- **New:** Order status expanded — `pending`, `paid`, `fulfilled`, `canceled`, `failed` (was: `pending`, `paid`, `expired`).
+- **New:** Order fields — `checkout_data`, `shipping_address`, `fulfillment_status`, `carrier`, `tracking_code`, `seller_note`, `paid_at`, `fulfilled_at`.
+- **New:** Webhook events — `order.fulfilled`, `order.shipped`.
+- **New:** `configure_webhook` readiness action — appears on external fulfillment listings without a webhook.
+- **Breaking:** `content_type` renamed to `deliverable_type`, `content_key` to `deliverable_key`, `content_value` to `deliverable_value`, `content_meta` to `deliverable_meta`, `has_content` to `has_deliverable`.
+- **Breaking:** `order.completed` webhook event removed — replaced by `order.paid` and `order.fulfilled`.
+- **Breaking:** `stripe_session_id` removed from order responses.
+
+## Migration
+
+### Field renames
+
+Before:
+```python
+listing["content_type"]  # "file"
+listing["has_content"]   # True
+```
+
+After:
+```python
+listing["deliverable_type"]  # "file"
+listing["has_deliverable"]   # True
+```
+
+### Webhook events
+
+Before:
+```python
+if event["type"] == "order.completed":
+    # handle order
+```
+
+After:
+```python
+if event["type"] == "order.paid":
+    # payment confirmed — start fulfillment
+elif event["type"] == "order.fulfilled":
+    # delivery complete
+```
+
+See the [Fulfillment modes guide](/fulfillment-modes) for the full overview, [Selling physical products](/physical-products) for address collection, and [Dynamic fulfillment](/dynamic-fulfillment) for AI-generated content delivery.

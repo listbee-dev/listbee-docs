@@ -1,55 +1,187 @@
 ---
 title: Orders & Delivery
-description: How checkout works, the order lifecycle, and how buyers receive content.
+description: The order lifecycle — from checkout to fulfillment — with state machine, fulfill/ship endpoints, and tracking.
 ---
 
-An order is created when a buyer visits a product page and completes payment. ListBee handles the full flow — Stripe Checkout, payment confirmation, and content delivery — without any additional code on your side.
-
----
-
-## How checkout works
-
-1. A buyer visits the product page URL (e.g. `https://buy.listbee.so/python-async-patterns`).
-2. They click the buy button, which opens a Stripe Checkout session.
-3. They complete payment on Stripe's hosted page.
-4. ListBee receives the payment confirmation webhook from Stripe.
-5. An access grant is created and the buyer receives their content by email.
-
-No redirect handling, no webhook setup, no email templates. It's all built in.
+An order is created when a buyer visits a product page. It starts as `pending` (checkout opened), transitions to `paid` on payment, and reaches `fulfilled` when delivery is complete.
 
 ---
 
 ## Order lifecycle
 
-Orders move through three states:
+Orders move through five states:
+
+```
+PENDING → PAID → FULFILLED
+              ↘ CANCELED
+              ↘ FAILED
+```
 
 | Status | Meaning |
 |--------|---------|
-| `pending` | Stripe Checkout session created. Buyer has not yet paid. |
-| `paid` | Payment confirmed. Access grant created. Content delivered. |
-| `expired` | Checkout session expired without payment (after 24 hours). |
+| `pending` | Buyer opened checkout. Payment not yet received. |
+| `paid` | Payment confirmed. Managed listings are fulfilled automatically. External listings wait for your app. |
+| `fulfilled` | Product delivered to the buyer. Terminal state. |
+| `canceled` | Order was canceled before fulfillment. Terminal. |
+| `failed` | Payment or fulfillment failed. Terminal. |
 
-A `paid` order is terminal — it will not change state. An `expired` order means the buyer abandoned checkout; they would need to revisit the product page to try again.
+### Managed fulfillment
+
+`PENDING → PAID → FULFILLED` happens automatically. ListBee creates an access grant and delivers the content on payment confirmation. Both `order.paid` and `order.fulfilled` webhooks fire.
+
+### External fulfillment
+
+`PENDING → PAID` happens automatically. Your app receives the `order.paid` webhook and handles delivery. Call `POST /v1/orders/{id}/fulfill` when done — this transitions the order to `FULFILLED` and fires `order.fulfilled`.
+
+For physical goods, call `POST /v1/orders/{id}/ship` first to record tracking info, then `fulfill` when delivered.
 
 ---
 
-## Access grants
+## Fulfillment tracking
 
-After payment, ListBee creates an access grant (`ag_...`) linked to the order. The grant controls how the buyer receives content:
+External orders have a `fulfillment_status` field that tracks delivery progress:
 
-| Content type | Delivery mechanism |
-|-------------|-------------------|
-| `FILE` | Time-limited signed URL sent by email. Valid for 48 hours. Buyers can re-request from the order confirmation page. |
-| `URL` | Buyer is redirected immediately after payment. |
-| `TEXT` | Inline content shown on the order confirmation page and sent by email. |
+| `fulfillment_status` | Meaning |
+|---------------------|---------|
+| `pending` | Payment confirmed, waiting for fulfillment |
+| `shipped` | Package shipped (after calling `/ship`) |
+| `fulfilled` | Product delivered to buyer |
 
-Access grants are not exposed in the API response — they're an internal mechanism. From the API's perspective, a `paid` order means content has been delivered.
+Managed orders skip straight to `fulfilled` — there's no intermediate state.
+
+---
+
+## Fulfill an order
+
+`POST /v1/orders/{id}/fulfill` marks an external order as fulfilled. Optionally push generated content for ListBee to deliver.
+
+<CodeGroup>
+
+```python title="Python — simple fulfill"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/orders/ord_abc123/fulfill",
+    headers={"Authorization": "Bearer lb_..."},
+    json={},
+)
+order = resp.json()
+print(order["status"])       # fulfilled
+print(order["fulfilled_at"]) # 2026-04-02T14:30:00Z
+```
+
+```typescript title="TypeScript — simple fulfill"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const order = await client.orders.fulfill("ord_abc123", {});
+console.log(order.status);       // fulfilled
+console.log(order.fulfilled_at); // 2026-04-02T14:30:00Z
+```
+
+</CodeGroup>
+
+### Fulfill with generated content
+
+Push content to ListBee for delivery — useful for [dynamic fulfillment](/dynamic-fulfillment) (AI-generated content, custom reports).
+
+<CodeGroup>
+
+```python title="Python — fulfill with content"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/orders/ord_abc123/fulfill",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "content": "Your personalized horoscope: Mercury is in retrograde...",
+    },
+)
+```
+
+```python title="Python — fulfill with file"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/orders/ord_abc123/fulfill",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "content_url": "https://your-bucket.s3.amazonaws.com/report.pdf",
+    },
+)
+```
+
+```typescript title="TypeScript — fulfill with content"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+await client.orders.fulfill("ord_abc123", {
+  content: "Your personalized horoscope: Mercury is in retrograde...",
+});
+```
+
+</CodeGroup>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `content` | string | Text content delivered inline to the buyer. |
+| `content_url` | string | URL to a file or page. ListBee auto-detects file vs URL. |
+| `content_type` | string | Override auto-detection: `"file"`, `"url"`, or `"text"`. |
+
+---
+
+## Ship an order
+
+`POST /v1/orders/{id}/ship` records shipping information on a `paid` order. Use this for physical goods before marking the order as fulfilled.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/orders/ord_abc123/ship",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "carrier": "USPS",
+        "tracking_code": "9400111899223456789012",
+        "seller_note": "Ships from Portland. Estimated 3-5 business days.",
+    },
+)
+order = resp.json()
+
+print(order["fulfillment_status"])  # shipped
+print(order["carrier"])             # USPS
+print(order["tracking_code"])       # 9400111899223456789012
+```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const order = await client.orders.ship("ord_abc123", {
+  carrier: "USPS",
+  trackingCode: "9400111899223456789012",
+  sellerNote: "Ships from Portland. Estimated 3-5 business days.",
+});
+
+console.log(order.fulfillment_status);  // shipped
+console.log(order.carrier);             // USPS
+console.log(order.tracking_code);       // 9400111899223456789012
+```
+
+</CodeGroup>
+
+This fires an `order.shipped` webhook event.
 
 ---
 
 ## List orders
 
-`GET /v1/orders` returns orders in reverse chronological order. Use cursor-based pagination to page through results.
+`GET /v1/orders` returns orders in reverse chronological order with cursor-based pagination.
 
 <CodeGroup>
 
@@ -86,7 +218,6 @@ for (const order of page.data) {
   console.log(order.id, order.status, order.amount);
 }
 
-// Paginate
 if (page.has_more) {
   const nextPage = await client.orders.list({
     limit: 20,
@@ -97,22 +228,11 @@ if (page.has_more) {
 
 </CodeGroup>
 
-The list response follows the standard list shape:
-
-```json
-{
-  "object": "list",
-  "data": [...],
-  "has_more": true,
-  "cursor": "ord_..."
-}
-```
-
 ---
 
 ## Get an order
 
-`GET /v1/orders/{id}` returns a single order by its `ord_...` ID.
+`GET /v1/orders/{id}` returns a single order.
 
 <CodeGroup>
 
@@ -120,19 +240,23 @@ The list response follows the standard list shape:
 import httpx
 
 resp = httpx.get(
-    "https://api.listbee.so/v1/orders/ord_...",
+    "https://api.listbee.so/v1/orders/ord_abc123",
     headers={"Authorization": "Bearer lb_..."},
 )
 order = resp.json()
 
-print(order["id"])            # ord_...
-print(order["status"])        # paid
-print(order["amount"])        # 1900 (cents)
-print(order["currency"])      # usd
-print(order["listing_id"])    # lst_...
-print(order["listing_slug"])  # python-async-patterns
-print(order["buyer_email"])   # buyer@example.com
-print(order["created_at"])    # ISO 8601 timestamp
+print(order["id"])                 # ord_abc123
+print(order["status"])             # paid
+print(order["amount"])             # 1900 (cents)
+print(order["currency"])           # usd
+print(order["listing_id"])         # lst_...
+print(order["listing_slug"])       # python-async-patterns
+print(order["buyer_email"])        # buyer@example.com
+print(order["checkout_data"])      # { "size": "M" } or null
+print(order["shipping_address"])   # { line1, city, ... } or null
+print(order["fulfillment_status"]) # pending | shipped | fulfilled | null
+print(order["paid_at"])            # 2026-04-02T10:00:00Z
+print(order["fulfilled_at"])       # 2026-04-02T14:30:00Z or null
 ```
 
 ```typescript title="TypeScript"
@@ -140,16 +264,20 @@ import { ListBee } from "listbee";
 
 const client = new ListBee({ apiKey: "lb_..." });
 
-const order = await client.orders.get("ord_...");
+const order = await client.orders.get("ord_abc123");
 
-console.log(order.id);            // ord_...
-console.log(order.status);        // paid
-console.log(order.amount);        // 1900 (cents)
-console.log(order.currency);      // usd
-console.log(order.listing_id);    // lst_...
-console.log(order.listing_slug);  // python-async-patterns
-console.log(order.buyer_email);   // buyer@example.com
-console.log(order.created_at);    // ISO 8601 timestamp
+console.log(order.id);                 // ord_abc123
+console.log(order.status);             // paid
+console.log(order.amount);             // 1900 (cents)
+console.log(order.currency);           // usd
+console.log(order.listing_id);         // lst_...
+console.log(order.listing_slug);       // python-async-patterns
+console.log(order.buyer_email);        // buyer@example.com
+console.log(order.checkout_data);      // { size: "M" } or null
+console.log(order.shipping_address);   // { line1, city, ... } or null
+console.log(order.fulfillment_status); // pending | shipped | fulfilled | null
+console.log(order.paid_at);           // 2026-04-02T10:00:00Z
+console.log(order.fulfilled_at);       // 2026-04-02T14:30:00Z or null
 ```
 
 </CodeGroup>
@@ -158,21 +286,36 @@ console.log(order.created_at);    // ISO 8601 timestamp
 
 ## Filter orders
 
-Use query parameters to filter the list:
-
 | Parameter | Description |
 |-----------|-------------|
 | `listing_slug` | Only return orders for a specific listing. |
-| `status` | Filter by status: `pending`, `paid`, or `expired`. |
+| `status` | Filter by status: `pending`, `paid`, `fulfilled`, `canceled`, `failed`. |
 | `limit` | Number of results per page. Max 100. Default 20. |
 | `cursor` | Pagination cursor from previous response. |
 
 ---
 
+## Key fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | `pending`, `paid`, `fulfilled`, `canceled`, `failed` |
+| `checkout_data` | object \| null | Buyer responses from checkout schema fields |
+| `shipping_address` | object \| null | Structured address from `address` checkout field |
+| `fulfillment_status` | string \| null | `pending`, `shipped`, `fulfilled` (external orders only) |
+| `carrier` | string \| null | Shipping carrier (after `/ship` call) |
+| `tracking_code` | string \| null | Tracking number (after `/ship` call) |
+| `seller_note` | string \| null | Note from seller (after `/ship` call) |
+| `paid_at` | string \| null | ISO 8601 timestamp of payment confirmation |
+| `fulfilled_at` | string \| null | ISO 8601 timestamp of fulfillment |
+
+---
+
 ## Next steps
 
-- [Webhooks](/webhooks) — get notified when orders are paid instead of polling.
-- [Listings](/listings) — manage the products that generate orders.
+- [Fulfillment modes](/fulfillment-modes) — managed vs external, when to use each.
+- [Webhooks](/webhooks) — get notified on `order.paid`, `order.shipped`, `order.fulfilled`.
+- [Checkout schema](/checkout-schema) — collect custom data from buyers.
 
 ---
 
@@ -182,27 +325,30 @@ Use query parameters to filter the list:
 ```python
 # ListBee — orders API
 #
-# Orders are created automatically when a buyer completes Stripe Checkout.
-# No code needed to trigger delivery — ListBee handles it on payment confirmation.
-#
 # Order lifecycle:
-#   pending  → buyer opened Stripe Checkout, not yet paid
-#   paid     → payment confirmed, content delivered (terminal)
-#   expired  → checkout expired without payment (terminal)
+#   PENDING → PAID → FULFILLED (managed: automatic, external: via API)
+#   PENDING → CANCELED | FAILED (terminal)
 #
-# Delivery by content type:
-#   FILE → signed URL emailed to buyer (valid 48h)
-#   URL  → redirect after payment
-#   TEXT → shown on confirmation page + emailed
+# Managed fulfillment: PAID → FULFILLED automatic (access grant + email)
+# External fulfillment: PAID → your app delivers → call /fulfill → FULFILLED
+#
+# Fulfill an order:
+#   POST /v1/orders/{id}/fulfill  { content?, content_url?, content_type? }
+#   → status: "fulfilled", fires order.fulfilled webhook
+#
+# Ship an order (physical goods):
+#   POST /v1/orders/{id}/ship  { carrier, tracking_code, seller_note? }
+#   → fulfillment_status: "shipped", fires order.shipped webhook
 #
 # List orders (cursor pagination):
 #   GET /v1/orders?limit=20&cursor=ord_...&status=paid&listing_slug=my-listing
 #   → { "object": "list", "data": [...], "has_more": bool, "cursor": str | null }
 #
 # Get order:
-#   GET /v1/orders/{id}      (id = ord_...)
-#   → { "object": "order", "id", "status", "amount", "currency",
-#       "listing_id", "listing_slug", "buyer_email", "created_at" }
+#   GET /v1/orders/{id}
+#   → { object, id, status, amount, currency, listing_id, listing_slug,
+#       buyer_email, checkout_data, shipping_address, fulfillment_status,
+#       carrier, tracking_code, seller_note, paid_at, fulfilled_at }
 #
 # Auth: Authorization: Bearer lb_...
 # Errors: RFC 9457 { type, title, status, detail, code, param }

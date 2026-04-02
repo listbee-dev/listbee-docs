@@ -1,0 +1,309 @@
+---
+title: Checkout schema
+description: Collect custom fields from buyers at checkout — addresses, sizes, dates, preferences.
+---
+
+The `checkout_schema` field on a listing defines custom fields shown to the buyer on the product page before payment. Buyer responses are stored on the order as `checkout_data`.
+
+Email is always collected — you don't need to add it to the schema.
+
+---
+
+## Adding fields
+
+Pass `checkout_schema` when creating or updating a listing. Each field has a `key`, `type`, `label`, and `required` flag.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "name": "Custom Portrait Drawing",
+        "price": 4900,
+        "fulfillment": "external",
+        "checkout_schema": [
+            {
+                "key": "style",
+                "type": "select",
+                "label": "Art style",
+                "required": True,
+                "options": ["Watercolor", "Pencil sketch", "Digital art"],
+            },
+            {
+                "key": "description",
+                "type": "text",
+                "label": "Describe what you want drawn",
+                "required": True,
+            },
+            {
+                "key": "deadline",
+                "type": "date",
+                "label": "Need it by (optional)",
+                "required": False,
+            },
+        ],
+    },
+)
+listing = resp.json()
+```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.create({
+  name: "Custom Portrait Drawing",
+  price: 4900,
+  fulfillment: "external",
+  checkoutSchema: [
+    {
+      key: "style",
+      type: "select",
+      label: "Art style",
+      required: true,
+      options: ["Watercolor", "Pencil sketch", "Digital art"],
+    },
+    {
+      key: "description",
+      type: "text",
+      label: "Describe what you want drawn",
+      required: true,
+    },
+    {
+      key: "deadline",
+      type: "date",
+      label: "Need it by (optional)",
+      required: false,
+    },
+  ],
+});
+```
+
+</CodeGroup>
+
+---
+
+## Field types
+
+| Type | Rendered as | Value in `checkout_data` | Notes |
+|------|-----------|--------------------------|-------|
+| `text` | Text input | `string` | General purpose. Free-form text. |
+| `select` | Dropdown | `string` | Requires `options` array. |
+| `date` | Date picker | `string` (ISO 8601 date) | `"2026-04-15"` format. |
+| `address` | Address form (line1, line2, city, state, postal_code, country) | Stored in `order.shipping_address` | Parsed into a structured `ShippingAddress` object, not stored in `checkout_data`. |
+
+---
+
+## Address fields
+
+The `address` type is special. It renders a full address form and stores the result as a structured `ShippingAddress` object on the order — not in `checkout_data`.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.post(
+    "https://api.listbee.so/v1/listings",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "name": "Handmade Leather Boots",
+        "price": 18900,
+        "fulfillment": "external",
+        "checkout_schema": [
+            {
+                "key": "shipping_address",
+                "type": "address",
+                "label": "Shipping address",
+                "required": True,
+            },
+        ],
+    },
+)
+```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const listing = await client.listings.create({
+  name: "Handmade Leather Boots",
+  price: 18900,
+  fulfillment: "external",
+  checkoutSchema: [
+    {
+      key: "shipping_address",
+      type: "address",
+      label: "Shipping address",
+      required: true,
+    },
+  ],
+});
+```
+
+</CodeGroup>
+
+The order response after payment:
+
+```json
+{
+  "object": "order",
+  "id": "ord_abc123",
+  "checkout_data": {},
+  "shipping_address": {
+    "line1": "123 Main St",
+    "line2": "Apt 4B",
+    "city": "Portland",
+    "state": "OR",
+    "postal_code": "97201",
+    "country": "US"
+  }
+}
+```
+
+---
+
+## Reading checkout data
+
+After payment, `checkout_data` is a dictionary keyed by the field `key` values you defined. Address fields are in `shipping_address` instead.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.get(
+    "https://api.listbee.so/v1/orders/ord_abc123",
+    headers={"Authorization": "Bearer lb_..."},
+)
+order = resp.json()
+
+# Custom fields
+print(order["checkout_data"]["style"])        # Watercolor
+print(order["checkout_data"]["description"])  # A portrait of my cat
+
+# Address (separate field)
+addr = order["shipping_address"]
+if addr:
+    print(f"{addr['line1']}, {addr['city']}, {addr['state']} {addr['postal_code']}")
+```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+const order = await client.orders.get("ord_abc123");
+
+// Custom fields
+console.log(order.checkout_data?.style);        // Watercolor
+console.log(order.checkout_data?.description);  // A portrait of my cat
+
+// Address (separate field)
+if (order.shipping_address) {
+  const addr = order.shipping_address;
+  console.log(`${addr.line1}, ${addr.city}, ${addr.state} ${addr.postal_code}`);
+}
+```
+
+</CodeGroup>
+
+---
+
+## Limits
+
+- Maximum 10 fields per listing.
+- `key` must be unique within the schema.
+- `options` is required for `select` type, ignored for others.
+- `address` type: maximum 1 per schema.
+
+---
+
+## Updating the schema
+
+Update `checkout_schema` on an existing listing. The new schema replaces the old one entirely.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+resp = httpx.put(
+    "https://api.listbee.so/v1/listings/r7kq2xy9",
+    headers={"Authorization": "Bearer lb_..."},
+    json={
+        "checkout_schema": [
+            {"key": "size", "type": "select", "label": "Size", "required": True, "options": ["S", "M", "L", "XL"]},
+        ],
+    },
+)
+```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+await client.listings.update("r7kq2xy9", {
+  checkoutSchema: [
+    { key: "size", type: "select", label: "Size", required: true, options: ["S", "M", "L", "XL"] },
+  ],
+});
+```
+
+</CodeGroup>
+
+To remove all custom fields, set `checkout_schema` to `null`.
+
+---
+
+## Next steps
+
+- [Selling physical products](/physical-products) — address collection with external fulfillment.
+- [Dynamic fulfillment](/dynamic-fulfillment) — use checkout data to generate content.
+- [Fulfillment modes](/fulfillment-modes) — managed vs external.
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```python
+# ListBee — checkout schema
+#
+# Add custom fields to the checkout page via checkout_schema on a listing.
+# Max 10 fields. Email is always collected (don't add it).
+#
+# Field types:
+#   text    → free-form text input     → checkout_data[key]: string
+#   select  → dropdown (requires options) → checkout_data[key]: string
+#   date    → date picker              → checkout_data[key]: "YYYY-MM-DD"
+#   address → full address form        → order.shipping_address: { line1, line2, city, state, postal_code, country }
+#
+# Create with schema:
+#   POST /v1/listings {
+#     name, price, fulfillment: "external",
+#     checkout_schema: [
+#       { key: "size", type: "select", label: "Size", required: true, options: ["S","M","L"] },
+#       { key: "shipping_address", type: "address", label: "Address", required: true }
+#     ]
+#   }
+#
+# Read checkout data from order:
+#   GET /v1/orders/{id}
+#   → order.checkout_data = { size: "M" }
+#   → order.shipping_address = { line1, line2, city, state, postal_code, country }
+#
+# Address fields go to shipping_address, not checkout_data.
+# Max 1 address field per schema.
+#
+# Auth: Authorization: Bearer lb_...
+# Docs: https://docs.listbee.so/checkout-schema
+```
+</CodeBlock>

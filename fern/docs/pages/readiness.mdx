@@ -140,9 +140,14 @@ def resolve_next_action(listing, api_key):
 | `connect_stripe` | `human` | No Stripe connected. No key available. | Visit `console.listbee.so/settings/payments` to start Stripe Connect. |
 | `enable_charges` | `human` | Stripe connected but charges disabled on the account. | Visit the URL in `resolve.url` to complete Stripe's requirements. |
 | `update_billing` | `human` | ListBee subscription billing is past due or unpaid. | Visit `console.listbee.so/settings/billing` to update payment method. |
+| `configure_webhook` | `api` | External fulfillment listing with no webhook registered. | `POST /v1/webhooks` with `{ "url": "https://...", "events": ["order.paid"] }` |
 
 <Note>
 `set_stripe_key` and `connect_stripe` are mutually exclusive. `set_stripe_key` appears when the agent already has a Stripe key to submit. `connect_stripe` appears when the user must go through the full Stripe Connect onboarding flow in a browser.
+</Note>
+
+<Note>
+`configure_webhook` only appears on listings with `fulfillment: "external"`. External listings need a webhook to receive `order.paid` events — without one, the listing cannot sell because no one would know about the order. Register a webhook endpoint to resolve this action.
 </Note>
 
 ---
@@ -159,6 +164,8 @@ A listing with Stripe connected, charges enabled, and content attached.
   "id": "lst_abc123",
   "slug": "python-async-patterns",
   "url": "https://buy.listbee.so/python-async-patterns",
+  "fulfillment": "managed",
+  "deliverable_type": "file",
   "readiness": {
     "sellable": true,
     "actions": [],
@@ -203,6 +210,34 @@ A listing with Stripe connected, charges enabled, and content attached.
       }
     ],
     "next": "set_stripe_key"
+  }
+}
+```
+
+### External listing with no webhook
+
+```json
+{
+  "object": "listing",
+  "id": "lst_abc123",
+  "slug": "custom-portrait",
+  "fulfillment": "external",
+  "readiness": {
+    "sellable": false,
+    "actions": [
+      {
+        "code": "configure_webhook",
+        "kind": "api",
+        "message": "Register a webhook endpoint to receive order.paid events for external fulfillment.",
+        "resolve": {
+          "method": "POST",
+          "endpoint": "/v1/webhooks",
+          "url": null,
+          "params": { "url": "<your_webhook_url>", "events": ["order.paid"] }
+        }
+      }
+    ],
+    "next": "configure_webhook"
   }
 }
 ```
@@ -276,11 +311,13 @@ ListBee's readiness system is purpose-built for agent-operated commerce. An agen
 #        wait for completion, re-fetch, repeat
 #
 # Action codes:
-#   set_stripe_key  api    POST /v1/account/stripe-key  { "secret_key": "sk_live_..." }
-#   connect_stripe  human  visit console.listbee.so/settings/payments
-#   enable_charges  human  visit action.resolve.url (Stripe dashboard)
-#   update_billing  human  visit console.listbee.so/settings/billing
+#   set_stripe_key     api    POST /v1/account/stripe-key  { "secret_key": "sk_live_..." }
+#   connect_stripe     human  visit console.listbee.so/settings/payments
+#   enable_charges     human  visit action.resolve.url (Stripe dashboard)
+#   update_billing     human  visit console.listbee.so/settings/billing
+#   configure_webhook  api    POST /v1/webhooks  { "url": "...", "events": ["order.paid"] }
 #
+# configure_webhook appears only on external fulfillment listings without a webhook.
 # next pointer prefers kind:"api" over kind:"human"
 # next is null when sellable is true
 #

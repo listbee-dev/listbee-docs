@@ -60,3 +60,13 @@ paths:
                   delivered_at: null
               cursor: evt_5nJ3wX8kR1sV6yZ2
               has_more: true
+  /v1/stores/store_id/stripe/connect:
+    post:
+      x-fern-examples:
+        - path-parameters:
+            store_id: store_id
+          response:
+            body:
+              object: stripe_connect_session
+              url: https://connect.stripe.com/setup/s/acct_1Gqj58Lz0qyl6XeW
+              expires_at: '2024-07-01T12:00:00Z'

@@ -114,7 +114,11 @@ Payment is connected per-store. If you create additional stores later, each one 
 
 ## Step 3: Create a listing
 
-Three required fields: `name`, `price` (in cents), and `content` (a URL or text payload). Currency is determined by your account settings.
+Two required fields: `name` and `price` (in cents). What you add beyond that determines how fulfillment works.
+
+### Simple: managed fulfillment (digital content)
+
+Pass `content` — ListBee delivers it automatically after payment.
 
 <CodeGroup>
 
@@ -136,6 +140,7 @@ resp = httpx.post(
 listing = resp.json()
 
 print(listing["url"])                      # https://buy.listbee.so/r7kq2xy9
+print(listing["fulfillment"])              # managed
 print(listing["readiness"]["sellable"])    # True — buyers can purchase now
 ```
 
@@ -151,7 +156,76 @@ const listing = await client.listings.create({
 });
 
 console.log(listing.url);                    // https://buy.listbee.so/r7kq2xy9
+console.log(listing.fulfillment);            // managed
 console.log(listing.readiness.sellable);     // true — buyers can purchase now
+```
+
+</CodeGroup>
+
+### Advanced: external fulfillment (your app delivers)
+
+Set `fulfillment: "external"` and register a webhook. ListBee collects payment and fires `order.paid` — your code handles delivery.
+
+<CodeGroup>
+
+```python title="Python"
+import httpx
+
+BASE = "https://api.listbee.so"
+API_KEY = "lb_..."
+
+# Register a webhook first
+httpx.post(
+    f"{BASE}/v1/webhooks",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={
+        "url": "https://yourapp.com/webhooks/listbee",
+        "events": ["order.paid"],
+    },
+)
+
+# Create an external listing
+resp = httpx.post(
+    f"{BASE}/v1/listings",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={
+        "name": "Custom Portrait Drawing",
+        "price": 4900,
+        "fulfillment": "external",
+        "checkout_schema": [
+            {"key": "style", "type": "select", "label": "Art style", "required": True, "options": ["Watercolor", "Pencil", "Digital"]},
+        ],
+    },
+)
+listing = resp.json()
+
+print(listing["url"])          # https://buy.listbee.so/custom-portrait
+print(listing["fulfillment"])  # external
+```
+
+```typescript title="TypeScript"
+import { ListBee } from "listbee";
+
+const client = new ListBee({ apiKey: "lb_..." });
+
+// Register a webhook first
+await client.webhooks.create({
+  url: "https://yourapp.com/webhooks/listbee",
+  events: ["order.paid"],
+});
+
+// Create an external listing
+const listing = await client.listings.create({
+  name: "Custom Portrait Drawing",
+  price: 4900,
+  fulfillment: "external",
+  checkoutSchema: [
+    { key: "style", type: "select", label: "Art style", required: true, options: ["Watercolor", "Pencil", "Digital"] },
+  ],
+});
+
+console.log(listing.url);          // https://buy.listbee.so/custom-portrait
+console.log(listing.fulfillment);  // external
 ```
 
 </CodeGroup>
@@ -165,6 +239,9 @@ If `sellable` is `false`, check `readiness.actions` — each action has a `code`
 ## What's next
 
 <Cards>
+  <Card title="Fulfillment modes" href="/fulfillment-modes">
+    Managed vs external — understand both delivery paths.
+  </Card>
   <Card title="Listings" href="/listings">
     Update content, pricing, cover images. Manage listing status.
   </Card>
@@ -172,7 +249,7 @@ If `sellable` is `false`, check `readiness.actions` — each action has a `code`
     How agents read and act on readiness signals.
   </Card>
   <Card title="Webhooks" href="/webhooks">
-    Get notified when orders complete or listings change.
+    Get notified when orders are paid, fulfilled, or shipped.
   </Card>
   <Card title="Python SDK" href="/python-sdk">
     Typed client — `pip install listbee`.
@@ -198,14 +275,17 @@ If `sellable` is `false`, check `readiness.actions` — each action has a `code`
 # Step 2: Stripe
 #   POST /v1/account/stripe-key  { "secret_key": "sk_live_..." }
 #     → 200 account object with readiness.operational: true
-#   (New Stripe users: POST /v1/account/stripe/connect → { url } to open in browser)
 #
-# Step 3: Listing
+# Step 3a: Managed listing (digital content — ListBee delivers)
 #   POST /v1/listings  { "name", "price" (cents), "content" }
-#     → 201 { object, id, slug, url, readiness: { sellable, actions, next }, ... }
+#     → 201 { fulfillment: "managed", deliverable_type: "file"|"url"|"text", ... }
+#
+# Step 3b: External listing (your app delivers)
+#   POST /v1/webhooks  { "url": "https://...", "events": ["order.paid"] }
+#   POST /v1/listings  { "name", "price", "fulfillment": "external", "checkout_schema"?: [...] }
+#     → 201 { fulfillment: "external", deliverable_type: null, ... }
 #
 # All requests: Authorization: Bearer lb_...
 # Errors:       RFC 9457 { type, title, status, detail, code, param }
 # Docs:         https://docs.listbee.so
-# Spec:         https://api.listbee.so/openapi.json
 ```

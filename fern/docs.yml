@@ -49,6 +49,9 @@ navigation:
         contents:
           - page: Listings
             path: ./docs/pages/listings.mdx
+          - page: Listing Lifecycle
+            slug: listing-lifecycle
+            path: ./docs/pages/listing-lifecycle.mdx
           - page: Orders & Delivery
             slug: orders
             path: ./docs/pages/orders.mdx
@@ -61,13 +64,12 @@ navigation:
           - page: Readiness System
             slug: readiness
             path: ./docs/pages/readiness.mdx
+          - page: Account
+            path: ./docs/pages/account.mdx
           - page: Payments
             path: ./docs/pages/payments.mdx
-          - page: Stores
-            path: ./docs/pages/stores.mdx
-          - page: Custom Domains
-            slug: custom-domains
-            path: ./docs/pages/custom-domains.mdx
+          - page: Billing
+            path: ./docs/pages/billing.mdx
           - page: Webhooks
             path: ./docs/pages/webhooks.mdx
           - page: Errors
@@ -88,13 +90,6 @@ navigation:
           - page: Claude Code Skill
             slug: claude-code-skill
             path: ./docs/pages/claude-code-skill.mdx
-          - page: Python SDK
-            path: ./docs/pages/python-sdk.mdx
-          - page: TypeScript SDK
-            path: ./docs/pages/typescript-sdk.mdx
-          - page: n8n Node
-            slug: n8n
-            path: ./docs/pages/n8n.mdx
 
       - section: Guides
         skip-slug: true
@@ -114,6 +109,9 @@ navigation:
           - page: Dynamic Fulfillment
             slug: dynamic-fulfillment
             path: ./docs/pages/dynamic-fulfillment.mdx
+          - page: Webhook Delivery Logs
+            slug: webhook-delivery-logs
+            path: ./docs/pages/webhook-delivery-logs.mdx
           - page: Google Analytics tracking
             slug: analytics
             path: ./docs/pages/analytics.mdx

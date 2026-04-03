@@ -26,6 +26,7 @@ tabs:
   api:
     display-name: API Reference
     icon: code
+    skip-slug: true
   changelog:
     display-name: Changelog
     icon: clock

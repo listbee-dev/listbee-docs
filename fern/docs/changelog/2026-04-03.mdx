@@ -1,0 +1,69 @@
+---
+tags: ["api", "breaking-change"]
+---
+
+# April 2026: Simplified architecture
+
+ListBee's API is now simpler and more powerful. Stores have been removed, listings have a proper lifecycle, and deliverables are mutable.
+
+## What changed
+
+- **Breaking:** Store entity removed — accounts own listings directly. All `/v1/stores/` endpoints are gone. Profile fields (display name, bio, avatar) now live on the account.
+- **Breaking:** Listing management routes changed from `/{slug}` to `/{listing_id}`. Slugs are still used for public product page URLs.
+- **Breaking:** Listing states changed from active/paused to **draft/published/paused**. New listings start as drafts and must be explicitly published.
+- **Changed:** Deliverables are now mutable. Set, replace, or remove a listing's deliverable via `PUT /v1/listings/{id}/deliverable` and `DELETE /v1/listings/{id}/deliverable`. Draft state only.
+- **Changed:** File upload via `POST /v1/files` returns a token. Pass the token to the deliverable endpoint to attach files.
+- **Changed:** Slugs are now derived from the listing name (human-readable). Changeable in draft, frozen after publish.
+- **Changed:** Fulfillment mode is computed from deliverable presence — no longer set explicitly.
+- **Removed:** Custom domains.
+- **Removed:** Multi-store support. One account = one brand.
+- **New:** Webhook delivery logs — `GET /v1/webhooks/{id}/events` to inspect delivery history.
+- **New:** Webhook test endpoint — `POST /v1/webhooks/{id}/test` to verify your endpoint.
+- **New:** Webhook retry — `POST /v1/webhooks/{id}/events/{event_id}/retry` to retry failed deliveries.
+- **New:** Auto-disable for webhooks after 3 consecutive permanent failures.
+- **New:** 29 supported currencies including zero-decimal currencies (JPY, KRW).
+
+## Migration
+
+### Store removal
+
+Before:
+```bash
+POST /v1/stores              # create store
+POST /v1/stores/{id}/stripe  # connect Stripe per store
+```
+
+After:
+```bash
+POST /v1/account/stripe-key         # connect Stripe on account
+POST /v1/account/stripe/connect     # or use Connect onboarding
+```
+
+### Listing routes
+
+Before:
+```bash
+GET /v1/listings/{slug}
+PUT /v1/listings/{slug}
+```
+
+After:
+```bash
+GET /v1/listings/{listing_id}
+PUT /v1/listings/{listing_id}
+```
+
+### Listing creation
+
+Before:
+```bash
+POST /v1/listings  { name, price, deliverable: "https://..." }
+# → active listing, immediately sellable
+```
+
+After:
+```bash
+POST /v1/listings                           { name, price }        # → draft
+PUT  /v1/listings/{id}/deliverable          { type, value/token }  # → managed
+POST /v1/listings/{id}/publish              # → published, sellable
+```

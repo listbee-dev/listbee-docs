@@ -1,0 +1,129 @@
+---
+title: Listing lifecycle
+description: Listing states (draft, published, paused), transitions, editability rules, and slug mutability.
+---
+
+Every listing has a `status` field that controls whether it can be purchased and what can be edited. There are three states: `draft`, `published`, and `paused`.
+
+---
+
+## States
+
+| State | Buyable | Editable | Deliverable mutable |
+|-------|---------|----------|---------------------|
+| `draft` | No | Yes | Yes |
+| `published` | Yes | No — core fields frozen | No |
+| `paused` | No | Yes | Yes |
+
+A listing starts in `draft`. Publishing validates the listing (price set, required fields present, account operational). Pausing pulls it from sale without losing any data. Resuming puts it back.
+
+---
+
+## Transitions
+
+### Draft → published
+
+```bash
+curl https://api.listbee.so/v1/listings/my-product/publish \
+  -X POST \
+  -H "Authorization: Bearer lb_your_api_key"
+```
+
+ListBee validates the listing before publishing. If validation fails, the response includes a `readiness` object with the blocking action.
+
+### Published → paused
+
+```bash
+curl https://api.listbee.so/v1/listings/my-product/pause \
+  -X POST \
+  -H "Authorization: Bearer lb_your_api_key"
+```
+
+Existing orders are not affected. Buyers cannot complete new purchases while paused.
+
+### Paused → published
+
+```bash
+curl https://api.listbee.so/v1/listings/my-product/resume \
+  -X POST \
+  -H "Authorization: Bearer lb_your_api_key"
+```
+
+Same validation as the initial publish. Returns an error if account readiness has lapsed (e.g. Stripe charges disabled).
+
+### Published → draft
+
+```bash
+curl https://api.listbee.so/v1/listings/my-product/unpublish \
+  -X POST \
+  -H "Authorization: Bearer lb_your_api_key"
+```
+
+Only allowed if the listing has zero orders. Use `pause` instead when you need to pull a listing that already has sales.
+
+---
+
+## Slug mutability
+
+The slug is the listing's globally unique identifier for buyer-facing URLs (`listbee.so/s/your-slug`).
+
+- **In draft** — the slug can be changed freely via `PUT /v1/listings/{id}`.
+- **After first publish** — the slug is frozen. Any attempt to change it returns a validation error.
+
+```bash
+# Change slug while in draft
+curl https://api.listbee.so/v1/listings/lst_r7kq2xy9m3pR5tW1 \
+  -X PUT \
+  -H "Authorization: Bearer lb_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"slug": "my-new-slug"}'
+```
+
+---
+
+## Editability rules
+
+| Field | draft | published | paused |
+|-------|-------|-----------|--------|
+| `title`, `description` | Yes | No | Yes |
+| `price` | Yes | No | Yes |
+| `slug` | Yes | No | No |
+| `checkout_schema` | Yes | No | Yes |
+| `deliverable` | Yes | No | Yes |
+| `webhook_url` (if set) | Yes | Yes | Yes |
+
+---
+
+## Next steps
+
+- [Listings](/listings) — full listing API reference.
+- [Deliverables](/deliverables) — attach files, URLs, or text for managed delivery.
+- [Readiness system](/readiness) — what ListBee checks before allowing publish.
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```bash
+# ListBee — Listing lifecycle
+#
+# States: draft | published | paused
+#
+# Transitions:
+#   POST /v1/listings/{slug}/publish    draft → published (validates)
+#   POST /v1/listings/{slug}/pause      published → paused
+#   POST /v1/listings/{slug}/resume     paused → published (validates)
+#   POST /v1/listings/{slug}/unpublish  published → draft (0 orders only)
+#
+# Editability:
+#   draft    → all fields editable, deliverable mutable
+#   published → core fields frozen, deliverable frozen
+#   paused   → all fields editable, deliverable mutable
+#
+# Slug:
+#   mutable in draft, frozen after first publish
+#
+# Docs: https://docs.listbee.so/listing-lifecycle
+```
+</CodeBlock>

@@ -1,0 +1,124 @@
+---
+title: Account
+description: Your seller identity — profile, Stripe connection, billing plan, and readiness.
+---
+
+Your account is your seller identity. It owns every listing, order, webhook, and API key in the system. Profile fields — display name, bio, avatar, and social links — live directly on the account. One human maps to one account maps to one brand.
+
+---
+
+## Get your account
+
+```bash
+curl https://api.listbee.so/v1/account \
+  -H "Authorization: Bearer lb_your_api_key"
+```
+
+```json
+{
+  "object": "account",
+  "id": "acc_r7kq2xy9m3pR5tW1",
+  "email": "you@example.com",
+  "display_name": "Acme Digital",
+  "bio": "We make tools for developers.",
+  "avatar_key": "avatars/acc_r7kq2xy9m3pR5tW1/photo.jpg",
+  "social_links": {
+    "twitter": "https://twitter.com/acmedigital",
+    "github": "https://github.com/acmedigital"
+  },
+  "plan": "growth",
+  "fee_rate": 0.05,
+  "currency": "usd",
+  "stats": {
+    "listing_count": 4,
+    "order_count": 120,
+    "total_revenue": 489500
+  },
+  "readiness": {
+    "operational": true,
+    "actions": [],
+    "next": null
+  }
+}
+```
+
+---
+
+## Update your account
+
+Send a `PUT` to `/v1/account` with the fields you want to change. All fields are optional.
+
+```bash
+curl https://api.listbee.so/v1/account \
+  -X PUT \
+  -H "Authorization: Bearer lb_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "display_name": "Acme Digital",
+    "bio": "We make tools for developers.",
+    "social_links": {
+      "twitter": "https://twitter.com/acmedigital"
+    },
+    "ga_measurement_id": "G-XXXXXXXXXX"
+  }'
+```
+
+---
+
+## Stripe connection
+
+Selling requires a connected Stripe account. There are two milestones:
+
+1. **Onboarding started** — `stripe_account_id` is set once you begin Stripe Connect onboarding.
+2. **Charges confirmed** — `payment_config` is populated once Stripe confirms the account can accept payments.
+
+`readiness.operational` requires both. Until charges are confirmed, listings can be published but cannot be purchased.
+
+---
+
+## Readiness
+
+The `readiness` object on your account tells you what actions are needed before you can sell.
+
+| Action code | Kind | What it means |
+|-------------|------|---------------|
+| `connect_stripe` | human | Start Stripe Connect onboarding in the console. |
+| `enable_charges` | human | Complete Stripe verification so charges are enabled. |
+| `update_billing` | human | Your billing plan payment failed — update your card. |
+
+`kind: human` means the action requires a person to complete it in a browser. `kind: api` means an API call resolves it.
+
+---
+
+## Next steps
+
+- [Payments](/payments) — how Stripe Connect works and how fees are collected.
+- [Listings](/listings) — create and publish your first product.
+- [Readiness system](/readiness) — full reference for readiness objects and action codes.
+
+---
+
+## Copy for AI assistants
+
+<CodeBlock title="Cursor / Claude Code">
+```bash
+# ListBee — Account
+#
+# GET /v1/account        → fetch seller account
+# PUT /v1/account        → update profile + settings
+#
+# Key fields:
+#   id: acc_...
+#   email: string (identity anchor, not communication)
+#   display_name, bio, avatar_key, social_links  (profile)
+#   plan: "free" | "growth" | "scale"
+#   fee_rate: float (0.10 / 0.05 / 0.03)
+#   currency: string (ISO 4217 lowercase)
+#   stripe_account_id: string | null  (set on onboarding start)
+#   payment_config: object | null     (set when charges confirmed)
+#   readiness.operational: bool       (true when ready to sell)
+#
+# Auth: Authorization: Bearer lb_...
+# Docs: https://docs.listbee.so/account
+```
+</CodeBlock>

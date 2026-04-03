@@ -624,7 +624,7 @@ paths:
               paid_at: '2026-04-02T14:30:00Z'
               fulfilled_at: '2026-04-02T15:00:00Z'
               created_at: '2026-04-02T14:00:00Z'
-  /v1/orders/{order_id}/fulfill:
+  /v1/orders/{order_id}/deliver:
     post:
       x-fern-examples:
         - path-parameters:

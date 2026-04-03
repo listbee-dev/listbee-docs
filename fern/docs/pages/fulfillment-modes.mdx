@@ -3,7 +3,7 @@ title: Fulfillment modes
 description: Every listing has a fulfillment mode — managed or external. Choose who delivers the product.
 ---
 
-Every listing has a `fulfillment` field: `"managed"` or `"external"`. This determines who delivers the product after payment.
+Every listing has a `fulfillment` field: `"managed"` or `"external"`. This is computed from whether a deliverable is attached — you don't set it directly.
 
 ---
 
@@ -13,44 +13,21 @@ ListBee delivers the product automatically. You attach a deliverable (file, URL,
 
 Best for: digital downloads, redirect links, license keys, text content.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/listings",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "name": "Python Async Patterns",
-        "price": 1900,
-        "deliverable": "https://your-bucket.s3.amazonaws.com/python-async.pdf",
-        # fulfillment defaults to "managed" when deliverable is provided
-    },
-)
-listing = resp.json()
-
-print(listing["fulfillment"])       # managed
-print(listing["deliverable_type"])  # file
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Python Async Patterns",
+    "price": 1900
+  }'
+# Create draft, then attach deliverable:
+curl -X PUT https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "url", "value": "https://your-bucket.s3.amazonaws.com/python-async.pdf"}'
+# → fulfillment: "managed"
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.create({
-  name: "Python Async Patterns",
-  price: 1900,
-  deliverable: "https://your-bucket.s3.amazonaws.com/python-async.pdf",
-  // fulfillment defaults to "managed" when deliverable is provided
-});
-
-console.log(listing.fulfillment);       // managed
-console.log(listing.deliverable_type);  // file
-```
-
-</CodeGroup>
 
 ### What ListBee handles in managed mode
 
@@ -70,44 +47,17 @@ Your app handles delivery. ListBee collects payment, fires an `order.paid` webho
 
 Best for: physical goods, AI-generated content, custom services, anything that requires logic after payment.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/listings",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "name": "Custom Portrait Drawing",
-        "price": 4900,
-        "fulfillment": "external",
-        # no deliverable — your app delivers after payment
-    },
-)
-listing = resp.json()
-
-print(listing["fulfillment"])       # external
-print(listing["deliverable_type"])  # None
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Custom Portrait Drawing",
+    "price": 4900
+  }'
+# No deliverable = external fulfillment
+# → fulfillment: "external"
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.create({
-  name: "Custom Portrait Drawing",
-  price: 4900,
-  fulfillment: "external",
-  // no deliverable — your app delivers after payment
-});
-
-console.log(listing.fulfillment);       // external
-console.log(listing.deliverable_type);  // null
-```
-
-</CodeGroup>
 
 ### What you handle in external mode
 
@@ -129,8 +79,8 @@ External fulfillment requires a registered webhook. If no webhook is configured,
 
 ```
 Do you have a file, URL, or text to deliver automatically?
-  → Yes: use managed fulfillment (default when deliverable is provided)
-  → No: use external fulfillment
+  → Yes: use managed fulfillment (attach a deliverable)
+  → No: use external fulfillment (leave no deliverable)
 
 Is delivery handled by your own code or a third party?
   → Yes: use external fulfillment
@@ -160,46 +110,14 @@ Does the product require information from the buyer (address, size, preferences)
 
 ## Defaults
 
-ListBee infers the fulfillment mode when you don't set it explicitly:
+Fulfillment mode is computed from deliverable presence — you cannot set it directly.
 
-| You provide | Inferred `fulfillment` |
-|------------|----------------------|
-| `deliverable` (file/URL/text) | `"managed"` |
-| No `deliverable` | `"external"` |
-| `fulfillment: "external"` + `deliverable` | `"external"` (deliverable ignored for delivery, stored as metadata) |
+| Deliverable attached? | `fulfillment` |
+|----------------------|---------------|
+| Yes (file/url/text) | `"managed"` |
+| No | `"external"` |
 
----
-
-## Switching modes
-
-Update the fulfillment mode on an existing listing:
-
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.put(
-    "https://api.listbee.so/v1/listings/r7kq2xy9",
-    headers={"Authorization": "Bearer lb_..."},
-    json={"fulfillment": "external"},
-)
-listing = resp.json()
-print(listing["fulfillment"])  # external
-```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.update("r7kq2xy9", {
-  fulfillment: "external",
-});
-console.log(listing.fulfillment);  // external
-```
-
-</CodeGroup>
+To switch modes: attach a deliverable (switches to managed) or remove it (switches to external).
 
 ---
 
@@ -214,30 +132,32 @@ console.log(listing.fulfillment);  // external
 
 ## Copy for AI assistants
 
-<CodeBlock title="Cursor / Claude Code">
-```python
+```bash
 # ListBee — fulfillment modes
 #
 # Every listing has fulfillment: "managed" | "external"
+# This is COMPUTED from deliverable presence — not set directly.
 #
-# MANAGED (default when deliverable is provided):
+# MANAGED (deliverable attached):
 #   ListBee delivers automatically — file download, URL redirect, or inline text.
 #   Order flow: PENDING → PAID → FULFILLED (all automatic)
 #   Events: order.paid + order.fulfilled both fire
 #
-# EXTERNAL (default when no deliverable):
+# EXTERNAL (no deliverable):
 #   ListBee collects payment, fires order.paid webhook, your app delivers.
 #   Order flow: PENDING → PAID (automatic) → FULFILLED (via POST /v1/orders/{id}/fulfill)
 #   Requires: registered webhook endpoint
 #   Events: order.paid fires on payment, order.fulfilled fires after you call fulfill
 #
 # Create managed listing:
-#   POST /v1/listings { name, price, deliverable: "https://..." }
-#   → fulfillment: "managed", deliverable_type: "file"
+#   POST /v1/listings { name, price }
+#   PUT /v1/listings/{id}/deliverable { type: "url", value: "https://..." }
+#   → fulfillment: "managed"
 #
 # Create external listing:
-#   POST /v1/listings { name, price, fulfillment: "external" }
-#   → fulfillment: "external", deliverable_type: null
+#   POST /v1/listings { name, price }
+#   (no deliverable attached)
+#   → fulfillment: "external"
 #
 # Fulfill an external order:
 #   POST /v1/orders/{id}/fulfill  { content?, content_type?, content_url? }
@@ -248,4 +168,3 @@ console.log(listing.fulfillment);  // external
 # Auth: Authorization: Bearer lb_...
 # Docs: https://docs.listbee.so/fulfillment-modes
 ```
-</CodeBlock>

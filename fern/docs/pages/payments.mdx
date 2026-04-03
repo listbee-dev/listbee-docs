@@ -19,34 +19,13 @@ Direct key submission (Path 1) is faster for agents — no browser required. Con
 
 If you already have a Stripe account with a secret key, submit it directly via the API. This is the agent-friendly path — no browser required.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/account/stripe-key",
-    headers={"Authorization": "Bearer lb_..."},
-    json={"secret_key": "sk_live_..."},
-)
-account = resp.json()
-print(account["readiness"]["operational"])  # True — ready to sell
+```bash
+curl -X POST https://api.listbee.so/v1/account/stripe-key \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"secret_key": "sk_live_..."}'
+# → account with readiness.operational: true
 ```
-
-```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/account/stripe-key", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer lb_...",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ secret_key: "sk_live_..." }),
-});
-const account = await resp.json();
-console.log(account.readiness.operational); // true — ready to sell
-```
-
-</CodeGroup>
 
 ListBee stores the key encrypted and validates it against Stripe before saving. The response is the updated account object with `readiness.operational: true`.
 
@@ -54,29 +33,11 @@ ListBee stores the key encrypted and validates it against Stripe before saving. 
 
 If the user doesn't have a Stripe account yet, call `POST /v1/account/stripe/connect` to start a guided onboarding flow. The response contains a URL for the user to open in their browser.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/account/stripe/connect",
-    headers={"Authorization": "Bearer lb_..."},
-)
-result = resp.json()
-print(result["url"])  # https://connect.stripe.com/... — open in browser
+```bash
+curl -X POST https://api.listbee.so/v1/account/stripe/connect \
+  -H "Authorization: Bearer lb_..."
+# → { "object": "stripe_connect_session", "url": "https://connect.stripe.com/..." }
 ```
-
-```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/account/stripe/connect", {
-  method: "POST",
-  headers: { "Authorization": "Bearer lb_..." },
-});
-const result = await resp.json();
-console.log(result.url); // https://connect.stripe.com/... — open in browser
-```
-
-</CodeGroup>
 
 After the user completes onboarding, the account's `readiness.operational` will be `true` when you re-fetch it.
 
@@ -86,27 +47,11 @@ After the user completes onboarding, the account's `readiness.operational` will 
 
 `DELETE /v1/account/stripe` removes the Stripe connection from your account. All active listings will become non-sellable immediately.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.delete(
-    "https://api.listbee.so/v1/account/stripe",
-    headers={"Authorization": "Bearer lb_..."},
-)
-# 204 No Content on success
+```bash
+curl -X DELETE https://api.listbee.so/v1/account/stripe \
+  -H "Authorization: Bearer lb_..."
+# → { "disconnected": true }
 ```
-
-```typescript title="TypeScript"
-const resp = await fetch("https://api.listbee.so/v1/account/stripe", {
-  method: "DELETE",
-  headers: { "Authorization": "Bearer lb_..." },
-});
-// 204 No Content on success
-```
-
-</CodeGroup>
 
 ---
 
@@ -151,8 +96,7 @@ Stripe's own processing fees (typically 2.9% + 30¢) apply on top of ListBee's f
 
 ## Copy for AI assistants
 
-<CodeBlock title="Cursor / Claude Code">
-```python
+```bash
 # ListBee — payments and Stripe integration
 #
 # Stripe connection options:
@@ -165,7 +109,7 @@ Stripe's own processing fees (typically 2.9% + 30¢) apply on top of ListBee's f
 #     → { "url": "https://connect.stripe.com/..." }  — open in browser
 #
 # Disconnect:
-#   DELETE /v1/account/stripe  → 204
+#   DELETE /v1/account/stripe  → { "disconnected": true }
 #   (All listings become non-sellable immediately)
 #
 # Fee model:
@@ -182,4 +126,3 @@ Stripe's own processing fees (typically 2.9% + 30¢) apply on top of ListBee's f
 # Auth: Authorization: Bearer lb_...
 # Errors: RFC 9457 { type, title, status, detail, code, param }
 ```
-</CodeBlock>

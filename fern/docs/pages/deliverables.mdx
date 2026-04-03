@@ -1,11 +1,11 @@
 ---
 title: Deliverables
-description: How ListBee detects and delivers digital content — files, URLs, and text.
+description: How to attach digital content to a listing — files, URLs, and text.
 ---
 
-A deliverable is the digital content attached to a listing. ListBee detects the type from what you pass to the `deliverable` field and handles delivery automatically when using [managed fulfillment](/fulfillment-modes).
+A deliverable is the digital content attached to a listing. You set the type explicitly using the `PUT /v1/listings/{id}/deliverable` endpoint. ListBee handles delivery automatically when using [managed fulfillment](/fulfillment-modes).
 
-Deliverables are one axis of the fulfillment model. The other is the [fulfillment mode](/fulfillment-modes) (managed vs external).
+Deliverables are one axis of the fulfillment model. The other is the [fulfillment mode](/fulfillment-modes) (managed vs external), which is computed from whether a deliverable is attached.
 
 | Deliverable type | Fulfillment mode | Result |
 |-----------------|-----------------|--------|
@@ -13,69 +13,33 @@ Deliverables are one axis of the fulfillment model. The other is the [fulfillmen
 | FILE / URL / TEXT | External | Content stored but your app handles delivery |
 | None | External | No content on listing — your app delivers everything |
 
----
-
-## Detection logic
-
-When you set `deliverable`, ListBee inspects the value:
-
-1. If the value is not a URL → **TEXT**
-2. If the value is a URL → ListBee sends a `HEAD` request
-3. Response `Content-Type` is a file MIME type (e.g. `application/pdf`, `application/zip`) → **FILE**
-4. Response `Content-Type` is `text/html` → **URL**
-
-The detected type is stored as `deliverable_type` on the listing: `"file"`, `"url"`, or `"text"`.
-
-<Tip>
-Detection is automatic. You don't need to specify the type in most cases.
-</Tip>
+<Note>
+Deliverables are mutable. Call `PUT` again to replace, or `DELETE /v1/listings/{id}/deliverable` to remove. Draft only — returns 409 if published.
+</Note>
 
 ---
 
 ## FILE
 
-A URL that points to a downloadable file.
+A file upload. Upload the file first via `POST /v1/files`, then attach the returned file token to the listing.
 
 **Examples:** PDF, ZIP, EPUB, MP3, dataset, software binary.
 
-**Delivery:** ListBee fetches the file, stores it on a CDN, and generates a signed time-limited download URL. The buyer receives an email with the link. Expires after 24 hours.
+**Delivery:** ListBee serves the file from a CDN and generates a signed time-limited download URL. The buyer receives an email with the link. Expires after 24 hours.
 
-<CodeGroup>
+```bash
+# Upload the file
+curl -X POST https://api.listbee.so/v1/files \
+  -H "Authorization: Bearer lb_..." \
+  -F "file=@advanced-python.pdf"
+# → { "object": "file", "id": "file_..." }
 
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/listings",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "name": "Advanced Python Patterns",
-        "price": 2900,
-        "deliverable": "https://my-bucket.s3.amazonaws.com/advanced-python.pdf",
-    },
-)
-listing = resp.json()
-
-print(listing["deliverable_type"])  # file
-print(listing["fulfillment"])       # managed
+# Attach to listing
+curl -X PUT https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "file", "token": "file_..."}'
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.create({
-  name: "Advanced Python Patterns",
-  price: 2900,
-  deliverable: "https://my-bucket.s3.amazonaws.com/advanced-python.pdf",
-});
-
-console.log(listing.deliverable_type);  // file
-console.log(listing.fulfillment);       // managed
-```
-
-</CodeGroup>
 
 ---
 
@@ -87,38 +51,12 @@ A URL that points to a web page.
 
 **Delivery:** After payment, the buyer receives an email with a link. Clicking it redirects to your URL. ListBee does not cache the page content.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/listings",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "name": "Private Research Notes",
-        "price": 1500,
-        "deliverable": "https://www.notion.so/your-page-id",
-    },
-)
-listing = resp.json()
-print(listing["deliverable_type"])  # url
+```bash
+curl -X PUT https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "url", "value": "https://www.notion.so/your-page-id"}'
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.create({
-  name: "Private Research Notes",
-  price: 1500,
-  deliverable: "https://www.notion.so/your-page-id",
-});
-console.log(listing.deliverable_type);  // url
-```
-
-</CodeGroup>
 
 ---
 
@@ -128,89 +66,29 @@ Plain text — a license key, API key, password, code snippet, discount code.
 
 **Delivery:** After payment, the text is shown on the confirmation page and included in the buyer email.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/listings",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "name": "Premium API Access",
-        "price": 4900,
-        "deliverable": "LICENSE-KEY-ABCD-1234-EFGH-5678",
-    },
-)
-listing = resp.json()
-print(listing["deliverable_type"])  # text
+```bash
+curl -X PUT https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "text", "value": "LICENSE-KEY-ABCD-1234-EFGH-5678"}'
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.create({
-  name: "Premium API Access",
-  price: 4900,
-  deliverable: "LICENSE-KEY-ABCD-1234-EFGH-5678",
-});
-console.log(listing.deliverable_type);  // text
-```
-
-</CodeGroup>
 
 ---
 
 ## No deliverable (external only)
 
-External fulfillment listings don't need a deliverable. Set `fulfillment: "external"` without `deliverable` — your app handles all delivery.
-
-```python
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/listings",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "name": "Custom Portrait Drawing",
-        "price": 4900,
-        "fulfillment": "external",
-        # no deliverable — deliverable_type will be null
-    },
-)
-listing = resp.json()
-print(listing["deliverable_type"])  # None
-print(listing["fulfillment"])       # external
-```
-
----
-
-## Renamed fields
-
-The `content_type` field has been renamed to `deliverable_type`. Similarly:
-
-| Old field | New field |
-|-----------|-----------|
-| `content_type` | `deliverable_type` |
-| `content_key` | `deliverable_key` |
-| `content_value` | `deliverable_value` |
-| `content_meta` | `deliverable_meta` |
-| `has_content` | `has_deliverable` |
-
-The create/update field is now `deliverable` (renamed from `content`).
+Don't attach a deliverable. The listing uses external fulfillment — your app delivers after payment.
 
 ---
 
 ## Summary
 
-| Type | `deliverable` value | After purchase (managed) |
-|------|----------------|--------------------------|
-| `file` | URL → file MIME type | Signed CDN download URL, expires 24h |
-| `url` | URL → HTML page | Redirect to your URL |
-| `text` | Non-URL string | Text shown inline in email |
-| `null` | No deliverable (external only) | Your app delivers |
+| Type | How to set | After purchase (managed) |
+|------|-----------|--------------------------|
+| `file` | Upload via `POST /v1/files`, then `PUT` with `token` | Signed CDN download URL, expires 24h |
+| `url` | `PUT` with `type: "url"` and `value` | Redirect to your URL |
+| `text` | `PUT` with `type: "text"` and `value` | Text shown inline in email |
+| `null` | No deliverable attached | Your app delivers |
 
 ---
 
@@ -224,31 +102,39 @@ The create/update field is now `deliverable` (renamed from `content`).
 
 ## Copy for AI assistants
 
-<CodeBlock title="Cursor / Claude Code">
-```python
-# ListBee — deliverables (formerly content types)
+```bash
+# ListBee — deliverables
 #
-# The `deliverable` field accepts a URL or plain text. Detection is automatic.
+# Attach digital content to a listing using PUT /v1/listings/{id}/deliverable
+# Type is set explicitly — not auto-detected.
+#
+# FILE (upload first, then attach):
+#   POST /v1/files  (multipart/form-data, field: "file")
+#   → { "object": "file", "id": "file_..." }
+#   PUT /v1/listings/{id}/deliverable  { "type": "file", "token": "file_..." }
+#
+# URL (web page redirect after purchase):
+#   PUT /v1/listings/{id}/deliverable  { "type": "url", "value": "https://..." }
+#
+# TEXT (license key, password, code snippet):
+#   PUT /v1/listings/{id}/deliverable  { "type": "text", "value": "..." }
+#
+# Remove deliverable:
+#   DELETE /v1/listings/{id}/deliverable
+#
+# Mutability: PUT replaces, DELETE removes. Draft only — 409 if published.
 #
 # deliverable_type values:
-#   "file" — URL resolves to file MIME type → CDN-hosted, signed download URL (24h)
-#   "url"  — URL resolves to text/html → redirect after purchase
-#   "text" — non-URL string → inline text in buyer email
-#   null   — no deliverable (external fulfillment only)
+#   "file" — CDN-hosted, signed download URL (24h)
+#   "url"  — redirect after purchase
+#   "text" — inline text in buyer email
+#   null   — no deliverable (external fulfillment)
 #
 # Two-axis model:
 #   deliverable_type (file/url/text/null) × fulfillment (managed/external)
 #   managed + file/url/text → ListBee delivers automatically
 #   external + any          → your app delivers (can use fulfill callback)
 #
-# Renamed fields (old → new):
-#   content_type → deliverable_type
-#   content_key → deliverable_key
-#   content_value → deliverable_value
-#   content_meta → deliverable_meta
-#   has_content → has_deliverable
-#
 # Auth: Authorization: Bearer lb_...
 # Docs: https://docs.listbee.so/deliverables
 ```
-</CodeBlock>

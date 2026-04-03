@@ -80,24 +80,21 @@ Each action in the `actions` array has four fields:
 
 The agent can resolve this action autonomously. Call `resolve.method` on `resolve.endpoint` with `resolve.params` as the request body.
 
-```python
-if action["kind"] == "api":
-    httpx.request(
-        action["resolve"]["method"],
-        f"https://api.listbee.so{action['resolve']['endpoint']}",
-        headers={"Authorization": "Bearer lb_..."},
-        json=action["resolve"]["params"],
-    )
+```bash
+# If action.kind is "api", call the resolve endpoint:
+curl -X POST https://api.listbee.so/v1/account/stripe-key \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"secret_key": "sk_live_..."}'
 ```
 
 ### kind: human
 
 The agent cannot resolve this action. A human must visit `resolve.url` in a browser to complete the step — for example, completing Stripe Connect onboarding or updating billing details.
 
-```python
-if action["kind"] == "human":
-    print(f"Action required: {action['message']}")
-    print(f"Visit: {action['resolve']['url']}")
+```
+Action required: Connect a Stripe account to start accepting payments.
+Visit: https://console.listbee.so/settings/payments
 ```
 
 ---
@@ -110,25 +107,7 @@ The selection rule: if any `kind: "api"` actions are present, `next` points to o
 
 This means an agent can always just follow `next` without reasoning about the full `actions` array.
 
-```python
-def resolve_next_action(listing, api_key):
-    readiness = listing["readiness"]
-    if readiness["sellable"]:
-        return  # done
-
-    next_code = readiness["next"]
-    action = next(a for a in readiness["actions"] if a["code"] == next_code)
-
-    if action["kind"] == "api":
-        httpx.request(
-            action["resolve"]["method"],
-            f"https://api.listbee.so{action['resolve']['endpoint']}",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json=action["resolve"]["params"],
-        )
-    else:
-        raise Exception(f"Human action required: {action['resolve']['url']}")
-```
+To act on the `next` pointer: fetch the listing, find the action in `actions` where `code == readiness.next`, then either call the `resolve.endpoint` (for `kind: "api"`) or surface `resolve.url` to the user (for `kind: "human"`). Re-fetch the listing after each action and repeat until `sellable` is `true`.
 
 ---
 
@@ -136,11 +115,14 @@ def resolve_next_action(listing, api_key):
 
 | Code | Kind | When triggered | How to resolve |
 |------|------|---------------|----------------|
-| `set_stripe_key` | `api` | No Stripe connected. Stripe secret key exists but not submitted. | `POST /v1/account/stripe-key` with `{ "secret_key": "sk_live_..." }` |
 | `connect_stripe` | `human` | No Stripe connected. No key available. | Visit `console.listbee.so/settings/payments` to start Stripe Connect. |
-| `enable_charges` | `human` | Stripe connected but charges disabled on the account. | Visit the URL in `resolve.url` to complete Stripe's requirements. |
-| `update_billing` | `human` | ListBee subscription billing is past due or unpaid. | Visit `console.listbee.so/settings/billing` to update payment method. |
-| `configure_webhook` | `api` | External fulfillment listing with no webhook registered. | `POST /v1/webhooks` with `{ "url": "https://...", "events": ["order.paid"] }` |
+| `set_stripe_key` | `api` | No Stripe connected. Agent has a key to submit. | `POST /v1/account/stripe-key` with `{ "secret_key": "sk_live_..." }` |
+| `enable_charges` | `human` | Stripe connected but charges disabled. | Visit the URL in `resolve.url` to complete Stripe's requirements. |
+| `update_billing` | `human` | Subscription billing past due. | Visit `console.listbee.so/settings/billing` to update payment method. |
+| `configure_webhook` | `api` | External fulfillment listing with no webhook. | `POST /v1/webhooks` with `{ "name": "...", "url": "https://...", "events": ["order.paid"] }` |
+| `publish_listing` | `api` | Listing is in draft state. | `POST /v1/listings/{id}/publish` |
+| `resume_listing` | `api` | Listing is paused. | `POST /v1/listings/{id}/resume` |
+| `webhook_disabled` | `api` | Webhook auto-disabled after failures. | `PUT /v1/webhooks/{id}` with `{ "enabled": true }` |
 
 <Note>
 `set_stripe_key` and `connect_stripe` are mutually exclusive. `set_stripe_key` appears when the agent already has a Stripe key to submit. `connect_stripe` appears when the user must go through the full Stripe Connect onboarding flow in a browser.
@@ -291,7 +273,7 @@ ListBee's readiness system is purpose-built for agent-operated commerce. An agen
 ## Copy for AI assistants
 
 <CodeBlock title="Cursor / Claude Code">
-```python
+```bash
 # ListBee — readiness system
 #
 # Every listing response includes readiness: { sellable, actions, next }
@@ -311,11 +293,14 @@ ListBee's readiness system is purpose-built for agent-operated commerce. An agen
 #        wait for completion, re-fetch, repeat
 #
 # Action codes:
-#   set_stripe_key     api    POST /v1/account/stripe-key  { "secret_key": "sk_live_..." }
 #   connect_stripe     human  visit console.listbee.so/settings/payments
+#   set_stripe_key     api    POST /v1/account/stripe-key  { "secret_key": "sk_live_..." }
 #   enable_charges     human  visit action.resolve.url (Stripe dashboard)
 #   update_billing     human  visit console.listbee.so/settings/billing
-#   configure_webhook  api    POST /v1/webhooks  { "url": "...", "events": ["order.paid"] }
+#   configure_webhook  api    POST /v1/webhooks  { "name": "...", "url": "...", "events": ["order.paid"] }
+#   publish_listing    api    POST /v1/listings/{id}/publish
+#   resume_listing     api    POST /v1/listings/{id}/resume
+#   webhook_disabled   api    PUT /v1/webhooks/{id}  { "enabled": true }
 #
 # configure_webhook appears only on external fulfillment listings without a webhook.
 # next pointer prefers kind:"api" over kind:"human"

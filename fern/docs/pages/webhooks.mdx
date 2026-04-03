@@ -11,40 +11,16 @@ Webhooks let you receive event notifications over HTTP. When an event occurs —
 
 `POST /v1/webhooks` takes a URL and a list of event types to subscribe to.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/webhooks",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "url": "https://yourapp.com/webhooks/listbee",
-        "events": ["order.paid", "order.fulfilled", "listing.created"],
-    },
-)
-webhook = resp.json()
-
-print(webhook["id"])      # wh_...
-print(webhook["secret"])  # whsec_... — store this, it's shown once
+```bash
+curl -X POST https://api.listbee.so/v1/webhooks \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Order notifications",
+    "url": "https://yourapp.com/webhooks/listbee",
+    "events": ["order.paid", "order.fulfilled"]
+  }'
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const webhook = await client.webhooks.create({
-  url: "https://yourapp.com/webhooks/listbee",
-  events: ["order.paid", "order.fulfilled", "listing.created"],
-});
-
-console.log(webhook.id);      // wh_...
-console.log(webhook.secret);  // whsec_... — store this, it's shown once
-```
-
-</CodeGroup>
 
 The `secret` field is returned only at creation time. Store it — you need it to verify incoming requests.
 
@@ -56,7 +32,7 @@ The `secret` field is returned only at creation time. Store it — you need it t
 |-------|--------------|
 | `order.created` | A buyer opens checkout (order is `pending`). |
 | `order.paid` | Payment confirmed. Fires for both managed and external fulfillment. |
-| `order.fulfilled` | Order marked as fulfilled. Managed: fires immediately after `order.paid`. External: fires after you call `/fulfill`. |
+| `order.fulfilled` | Order marked as fulfilled. Managed: fires immediately after `order.paid`. External: fires after you call `/deliver`. |
 | `order.shipped` | Shipping info recorded via `POST /v1/orders/{id}/ship`. |
 | `listing.created` | A new listing is created. |
 | `listing.updated` | Any field on a listing changes. |
@@ -65,7 +41,7 @@ The `secret` field is returned only at creation time. Store it — you need it t
 Subscribe to the events you care about. You can subscribe to multiple events per webhook endpoint.
 
 <Note>
-`order.paid` and `order.fulfilled` both fire for all fulfillment modes. For managed listings, they fire in quick succession. For external listings, `order.fulfilled` fires only after you call the fulfill endpoint.
+`order.paid` and `order.fulfilled` both fire for all fulfillment modes. For managed listings, they fire in quick succession. For external listings, `order.fulfilled` fires only after you call the deliver endpoint.
 </Note>
 
 ---
@@ -198,9 +174,7 @@ Every webhook request includes a `X-ListBee-Signature` header. Verify it before 
 
 The signature is an HMAC-SHA256 hex digest of the raw request body, signed with your webhook secret.
 
-<CodeGroup>
-
-```python title="Python"
+```python
 import hashlib
 import hmac
 from fastapi import Request, HTTPException
@@ -238,52 +212,15 @@ async def handle_webhook(request: Request):
     return {"ok": True}
 ```
 
-```typescript title="TypeScript"
-import { createHmac, timingSafeEqual } from "crypto";
-import type { Request, Response } from "express";
-
-const WEBHOOK_SECRET = "whsec_..."; // from webhook creation
-
-export function handleWebhook(req: Request, res: Response) {
-  const payload = req.body as Buffer; // ensure raw body
-  const signature = req.headers["x-listbee-signature"] as string;
-
-  const expected = createHmac("sha256", WEBHOOK_SECRET)
-    .update(payload)
-    .digest("hex");
-
-  const sigBuffer = Buffer.from(signature, "hex");
-  const expectedBuffer = Buffer.from(expected, "hex");
-
-  if (
-    sigBuffer.length !== expectedBuffer.length ||
-    !timingSafeEqual(sigBuffer, expectedBuffer)
-  ) {
-    return res.status(400).json({ error: "Invalid signature" });
-  }
-
-  const event = JSON.parse(payload.toString());
-
-  if (event.type === "order.paid") {
-    const data = event.data;
-    console.log(`Order paid: ${data.order_id} — ${data.buyer_email}`);
-  } else if (event.type === "order.fulfilled") {
-    const data = event.data;
-    console.log(`Order fulfilled: ${data.order_id}`);
-  } else if (event.type === "order.shipped") {
-    const data = event.data;
-    console.log(`Order shipped: ${data.order_id} via ${data.carrier}`);
-  }
-
-  res.json({ ok: true });
-}
-```
-
-</CodeGroup>
-
 <Warning>
 Always use timing-safe comparison for signature verification. Standard string equality (`==`) is vulnerable to timing attacks that can leak your webhook secret.
 </Warning>
+
+---
+
+## Delivery logs and debugging
+
+Webhook endpoints keep a delivery log. Use `GET /v1/webhooks/{id}/events` to inspect delivery history, `POST /v1/webhooks/{id}/test` to verify your endpoint, and `POST /v1/webhooks/{id}/events/{event_id}/retry` to retry failed events. Webhooks are auto-disabled after 3 consecutive permanent failures. See [Webhook delivery logs](/webhook-delivery-logs) for details.
 
 ---
 
@@ -307,37 +244,17 @@ After 5 failed attempts, the event is dropped. Your endpoint should return `200`
 
 Send a test event to verify your endpoint is reachable and signature verification works.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/webhooks/wh_.../test",
-    headers={"Authorization": "Bearer lb_..."},
-)
-result = resp.json()
-print(result["delivered"])    # True if your endpoint returned 2xx
-print(result["status_code"])  # HTTP status your endpoint returned
+```bash
+curl -X POST https://api.listbee.so/v1/webhooks/wh_.../test \
+  -H "Authorization: Bearer lb_..."
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const result = await client.webhooks.test("wh_...");
-console.log(result.delivered);    // true if your endpoint returned 2xx
-console.log(result.status_code);  // HTTP status your endpoint returned
-```
-
-</CodeGroup>
 
 ---
 
 ## Next steps
 
 - [Fulfillment modes](/fulfillment-modes) — understand when `order.paid` vs `order.fulfilled` matters.
+- [Webhook delivery logs](/webhook-delivery-logs) — inspect delivery history, retry failed events.
 - [Errors](/errors) — handle webhook delivery failures and error responses.
 - [Idempotency](/idempotency) — ensure your webhook handler processes events exactly once.
 
@@ -346,17 +263,17 @@ console.log(result.status_code);  // HTTP status your endpoint returned
 ## Copy for AI assistants
 
 <CodeBlock title="Cursor / Claude Code">
-```python
+```bash
 # ListBee — webhooks
 #
 # Register:
-#   POST /v1/webhooks  { "url": "https://...", "events": ["order.paid", ...] }
-#   → { "id": "wh_...", "secret": "whsec_..." }  ← secret shown once, store it
+#   POST /v1/webhooks  { "name": "...", "url": "https://...", "events": ["order.paid", ...] }
+#   Response: { "id": "wh_...", "secret": "whsec_..." }  <- secret shown once, store it
 #
 # Events:
 #   order.created    buyer opened checkout (status: pending)
 #   order.paid       payment confirmed (fires for ALL fulfillment modes)
-#   order.fulfilled  order delivered (managed: auto, external: after /fulfill call)
+#   order.fulfilled  order delivered (managed: auto, external: after /deliver call)
 #   order.shipped    shipping info recorded (after /ship call)
 #   listing.created  new listing created
 #   listing.updated  listing field changed
@@ -379,6 +296,12 @@ console.log(result.status_code);  // HTTP status your endpoint returned
 #   secret: whsec_... (from webhook creation)
 #   compute: hmac.new(secret, raw_body, sha256).hexdigest()
 #   compare with timing-safe equality
+#
+# Delivery logs and retry:
+#   GET  /v1/webhooks/{id}/events                     inspect delivery history
+#   POST /v1/webhooks/{id}/test                       verify endpoint reachability
+#   POST /v1/webhooks/{id}/events/{event_id}/retry    retry a failed event
+#   Auto-disabled after 3 consecutive permanent failures
 #
 # Retry policy (exponential backoff on non-2xx or timeout):
 #   1: immediate, 2: 30s, 3: 5m, 4: 30m, 5: 2h (then dropped)

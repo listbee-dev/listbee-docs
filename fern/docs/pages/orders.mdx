@@ -31,9 +31,9 @@ PENDING → PAID → FULFILLED
 
 ### External fulfillment
 
-`PENDING → PAID` happens automatically. Your app receives the `order.paid` webhook and handles delivery. Call `POST /v1/orders/{id}/fulfill` when done — this transitions the order to `FULFILLED` and fires `order.fulfilled`.
+`PENDING → PAID` happens automatically. Your app receives the `order.paid` webhook and handles delivery. Call `POST /v1/orders/{id}/deliver` when done — this transitions the order to `FULFILLED` and fires `order.fulfilled`.
 
-For physical goods, call `POST /v1/orders/{id}/ship` first to record tracking info, then `fulfill` when delivered.
+For physical goods, call `POST /v1/orders/{id}/ship` first to record tracking info, then `deliver` when complete.
 
 ---
 
@@ -51,84 +51,46 @@ Managed orders skip straight to `fulfilled` — there's no intermediate state.
 
 ---
 
-## Fulfill an order
+## Deliver an order
 
-`POST /v1/orders/{id}/fulfill` marks an external order as fulfilled. Optionally push generated content for ListBee to deliver.
+`POST /v1/orders/{id}/deliver` marks an external order as fulfilled. Optionally push generated content for ListBee to deliver to the buyer.
 
-<CodeGroup>
+```bash
+# Deliver without content (external fulfillment you handle yourself)
+curl -X POST https://api.listbee.so/v1/orders/ord_.../deliver \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{}'
 
-```python title="Python — simple fulfill"
-import httpx
+# Deliver text content inline
+curl -X POST https://api.listbee.so/v1/orders/ord_.../deliver \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "text", "value": "Your delivery content"}'
 
-resp = httpx.post(
-    "https://api.listbee.so/v1/orders/ord_abc123/fulfill",
-    headers={"Authorization": "Bearer lb_..."},
-    json={},
-)
-order = resp.json()
-print(order["status"])       # fulfilled
-print(order["fulfilled_at"]) # 2026-04-02T14:30:00Z
+# Deliver a URL redirect
+curl -X POST https://api.listbee.so/v1/orders/ord_.../deliver \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "url", "value": "https://yourapp.com/delivery/abc123"}'
+
+# Deliver a file (upload first, then deliver with token)
+curl -X POST https://api.listbee.so/v1/files \
+  -H "Authorization: Bearer lb_..." \
+  -F "file=@report.pdf"
+# Response: { "id": "file_..." }
+
+curl -X POST https://api.listbee.so/v1/orders/ord_.../deliver \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "file", "token": "file_..."}'
 ```
-
-```typescript title="TypeScript — simple fulfill"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const order = await client.orders.fulfill("ord_abc123", {});
-console.log(order.status);       // fulfilled
-console.log(order.fulfilled_at); // 2026-04-02T14:30:00Z
-```
-
-</CodeGroup>
-
-### Fulfill with generated content
-
-Push content to ListBee for delivery — useful for [dynamic fulfillment](/dynamic-fulfillment) (AI-generated content, custom reports).
-
-<CodeGroup>
-
-```python title="Python — fulfill with content"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/orders/ord_abc123/fulfill",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "content": "Your personalized horoscope: Mercury is in retrograde...",
-    },
-)
-```
-
-```python title="Python — fulfill with file"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/orders/ord_abc123/fulfill",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "content_url": "https://your-bucket.s3.amazonaws.com/report.pdf",
-    },
-)
-```
-
-```typescript title="TypeScript — fulfill with content"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-await client.orders.fulfill("ord_abc123", {
-  content: "Your personalized horoscope: Mercury is in retrograde...",
-});
-```
-
-</CodeGroup>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `content` | string | Text content delivered inline to the buyer. |
-| `content_url` | string | URL to a file or page. ListBee auto-detects file vs URL. |
-| `content_type` | string | Override auto-detection: `"file"`, `"url"`, or `"text"`. |
+| `type` | string | `"file"`, `"url"`, or `"text"`. Required when pushing content. |
+| `token` | string | Upload token from `POST /v1/files`. Used when `type` is `"file"`. |
+| `value` | string | URL or text content. Used when `type` is `"url"` or `"text"`. |
 
 ---
 
@@ -136,44 +98,16 @@ await client.orders.fulfill("ord_abc123", {
 
 `POST /v1/orders/{id}/ship` records shipping information on a `paid` order. Use this for physical goods before marking the order as fulfilled.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/orders/ord_abc123/ship",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "carrier": "USPS",
-        "tracking_code": "9400111899223456789012",
-        "seller_note": "Ships from Portland. Estimated 3-5 business days.",
-    },
-)
-order = resp.json()
-
-print(order["fulfillment_status"])  # shipped
-print(order["carrier"])             # USPS
-print(order["tracking_code"])       # 9400111899223456789012
+```bash
+curl -X POST https://api.listbee.so/v1/orders/ord_.../ship \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "carrier": "FedEx",
+    "tracking_code": "794644790138",
+    "seller_note": "Ships from Portland. Estimated 3-5 business days."
+  }'
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const order = await client.orders.ship("ord_abc123", {
-  carrier: "USPS",
-  trackingCode: "9400111899223456789012",
-  sellerNote: "Ships from Portland. Estimated 3-5 business days.",
-});
-
-console.log(order.fulfillment_status);  // shipped
-console.log(order.carrier);             // USPS
-console.log(order.tracking_code);       // 9400111899223456789012
-```
-
-</CodeGroup>
 
 This fires an `order.shipped` webhook event.
 
@@ -183,50 +117,17 @@ This fires an `order.shipped` webhook event.
 
 `GET /v1/orders` returns orders in reverse chronological order with cursor-based pagination.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.get(
-    "https://api.listbee.so/v1/orders",
-    headers={"Authorization": "Bearer lb_..."},
-    params={"limit": 20},
-)
-result = resp.json()
-
-for order in result["data"]:
-    print(order["id"], order["status"], order["amount"])
-
-# Paginate
-if result["has_more"]:
-    next_resp = httpx.get(
-        "https://api.listbee.so/v1/orders",
-        headers={"Authorization": "Bearer lb_..."},
-        params={"limit": 20, "cursor": result["cursor"]},
-    )
+```bash
+curl "https://api.listbee.so/v1/orders?limit=20" \
+  -H "Authorization: Bearer lb_..."
 ```
 
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
+Paginate with the cursor from the previous response:
 
-const client = new ListBee({ apiKey: "lb_..." });
-
-const page = await client.orders.list({ limit: 20 });
-
-for (const order of page.data) {
-  console.log(order.id, order.status, order.amount);
-}
-
-if (page.has_more) {
-  const nextPage = await client.orders.list({
-    limit: 20,
-    cursor: page.cursor,
-  });
-}
+```bash
+curl "https://api.listbee.so/v1/orders?limit=20&cursor=ord_..." \
+  -H "Authorization: Bearer lb_..."
 ```
-
-</CodeGroup>
 
 ---
 
@@ -234,53 +135,10 @@ if (page.has_more) {
 
 `GET /v1/orders/{id}` returns a single order.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.get(
-    "https://api.listbee.so/v1/orders/ord_abc123",
-    headers={"Authorization": "Bearer lb_..."},
-)
-order = resp.json()
-
-print(order["id"])                 # ord_abc123
-print(order["status"])             # paid
-print(order["amount"])             # 1900 (cents)
-print(order["currency"])           # usd
-print(order["listing_id"])         # lst_...
-print(order["listing_slug"])       # python-async-patterns
-print(order["buyer_email"])        # buyer@example.com
-print(order["checkout_data"])      # { "size": "M" } or null
-print(order["shipping_address"])   # { line1, city, ... } or null
-print(order["fulfillment_status"]) # pending | shipped | fulfilled | null
-print(order["paid_at"])            # 2026-04-02T10:00:00Z
-print(order["fulfilled_at"])       # 2026-04-02T14:30:00Z or null
+```bash
+curl https://api.listbee.so/v1/orders/ord_... \
+  -H "Authorization: Bearer lb_..."
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const order = await client.orders.get("ord_abc123");
-
-console.log(order.id);                 // ord_abc123
-console.log(order.status);             // paid
-console.log(order.amount);             // 1900 (cents)
-console.log(order.currency);           // usd
-console.log(order.listing_id);         // lst_...
-console.log(order.listing_slug);       // python-async-patterns
-console.log(order.buyer_email);        // buyer@example.com
-console.log(order.checkout_data);      // { size: "M" } or null
-console.log(order.shipping_address);   // { line1, city, ... } or null
-console.log(order.fulfillment_status); // pending | shipped | fulfilled | null
-console.log(order.paid_at);           // 2026-04-02T10:00:00Z
-console.log(order.fulfilled_at);       // 2026-04-02T14:30:00Z or null
-```
-
-</CodeGroup>
 
 ---
 
@@ -322,33 +180,34 @@ console.log(order.fulfilled_at);       // 2026-04-02T14:30:00Z or null
 ## Copy for AI assistants
 
 <CodeBlock title="Cursor / Claude Code">
-```python
+```bash
 # ListBee — orders API
 #
 # Order lifecycle:
-#   PENDING → PAID → FULFILLED (managed: automatic, external: via API)
-#   PENDING → CANCELED | FAILED (terminal)
+#   PENDING -> PAID -> FULFILLED (managed: automatic, external: via API)
+#   PENDING -> CANCELED | FAILED (terminal)
 #
-# Managed fulfillment: PAID → FULFILLED automatic (access grant + email)
-# External fulfillment: PAID → your app delivers → call /fulfill → FULFILLED
+# Managed fulfillment: PAID -> FULFILLED automatic (access grant + email)
+# External fulfillment: PAID -> your app delivers -> call /deliver -> FULFILLED
 #
-# Fulfill an order:
-#   POST /v1/orders/{id}/fulfill  { content?, content_url?, content_type? }
-#   → status: "fulfilled", fires order.fulfilled webhook
+# Deliver an order:
+#   POST /v1/orders/{id}/deliver  {}
+#     or with content: { "type": "text"|"url"|"file", "value": "..."|"token": "file_..." }
+#   Response: order object with status: "fulfilled", fires order.fulfilled webhook
 #
 # Ship an order (physical goods):
-#   POST /v1/orders/{id}/ship  { carrier, tracking_code, seller_note? }
-#   → fulfillment_status: "shipped", fires order.shipped webhook
+#   POST /v1/orders/{id}/ship  { "carrier": "FedEx", "tracking_code": "...", "seller_note"? }
+#   Response: order with fulfillment_status: "shipped", fires order.shipped webhook
 #
 # List orders (cursor pagination):
 #   GET /v1/orders?limit=20&cursor=ord_...&status=paid&listing_slug=my-listing
-#   → { "object": "list", "data": [...], "has_more": bool, "cursor": str | null }
+#   Response: { "object": "list", "data": [...], "has_more": bool, "cursor": str | null }
 #
 # Get order:
 #   GET /v1/orders/{id}
-#   → { object, id, status, amount, currency, listing_id, listing_slug,
-#       buyer_email, checkout_data, shipping_address, fulfillment_status,
-#       carrier, tracking_code, seller_note, paid_at, fulfilled_at }
+#   Response: { object, id, status, amount, currency, listing_id, listing_slug,
+#     buyer_email, checkout_data, shipping_address, fulfillment_status,
+#     carrier, tracking_code, seller_note, paid_at, fulfilled_at }
 #
 # Auth: Authorization: Bearer lb_...
 # Errors: RFC 9457 { type, title, status, detail, code, param }

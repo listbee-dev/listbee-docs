@@ -9,39 +9,16 @@ ListBee is a REST API for creating and selling digital content. The primary reso
 
 Two required fields: `name` and `price`. Add `deliverable` and the listing can sell immediately. Currency is determined by your account settings.
 
-<CodeGroup>
-
-```python title="Python"
-from listbee import ListBee
-
-client = ListBee(api_key="lb_...")
-
-listing = client.listings.create(
-    name="Python Async Patterns",
-    price=1900,        # cents
-    deliverable="https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
-)
-
-print(listing.url)        # https://buy.listbee.so/r7kq2xy9
-print(listing.readiness.sellable)  # True — buyers can purchase now
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Python Async Patterns",
+    "price": 1900
+  }'
+# → { "object": "listing", "id": "lst_...", "slug": "python-async-patterns", "status": "draft" }
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.create({
-  name: "Python Async Patterns",
-  price: 1900,        // cents
-  deliverable: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
-});
-
-console.log(listing.url);               // https://buy.listbee.so/r7kq2xy9
-console.log(listing.readiness.sellable); // true — buyers can purchase now
-```
-
-</CodeGroup>
 
 The `url` field is the product page. Share it with buyers directly. No additional setup required if Stripe is already connected.
 
@@ -104,21 +81,23 @@ Agents never touch payment data. Humans never interact with the API.
 
 ## Copy for AI assistants
 
-```python
+```bash
 # ListBee API — key facts for AI agents
 #
 # Base URL: https://api.listbee.so
 # Auth:     Authorization: Bearer lb_...
 #
 # Core flow:
-#   1. POST /v1/account/signup    { email }                  → OTP sent
-#   2. POST /v1/account/verify    { email, code }            → api_key
-#   3. POST /v1/account/stripe-key { secret_key }            → account.readiness.operational
-#   4. POST /v1/listings          { name, price, deliverable } → listing.url + readiness.sellable
+#   1. POST /v1/auth/otp/start     { email }                  → OTP sent
+#   2. POST /v1/auth/otp/verify    { email, code }            → api_key
+#   3. POST /v1/account/stripe-key { secret_key }             → account.readiness.operational
+#   4. POST /v1/listings           { name, price }            → draft
+#      PUT  /v1/listings/{id}/deliverable  { type, value }    → managed
+#      POST /v1/listings/{id}/publish                         → published, sellable
 #
 # Listing response includes:
 #   - url:                product page URL (share with buyers)
-#   - readiness.sellable: True when buyers can purchase
+#   - readiness.sellable: true when buyers can purchase
 #   - readiness.actions:  list of actions needed if not sellable
 #   - readiness.next:     highest-priority action code
 #

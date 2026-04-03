@@ -1,10 +1,4 @@
-.PHONY: sync-openapi sync-openapi-dev preview build deploy
-
-sync-openapi:
-	curl -s https://api.listbee.so/openapi.json > fern/openapi/openapi.json
-
-sync-openapi-dev:
-	curl -s http://localhost:8000/_api/openapi.json > fern/openapi/openapi.json
+.PHONY: preview build deploy
 
 preview:
 	npx fern docs dev
@@ -12,5 +6,5 @@ preview:
 build:
 	npx fern generate --docs
 
-deploy: sync-openapi
+deploy:
 	npx fern generate --docs --force

@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Three API calls to go from zero to a live listing — account, Stripe, listing.
+description: Three steps to go from zero to a live listing — account, Stripe, listing.
 ---
 
 Three steps to go from zero to a live listing: create an account, connect Stripe, create a listing.
@@ -11,54 +11,23 @@ Three steps to go from zero to a live listing: create an account, connect Stripe
 
 Send your email to receive a one-time code. Then verify the code to get your API key.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-BASE = "https://api.listbee.so"
-
+```bash
 # 1a. Request OTP
-httpx.post(f"{BASE}/v1/account/signup", json={"email": "you@example.com"})
+curl -X POST https://api.listbee.so/v1/auth/otp/start \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com"}'
+# → 200 { "object": "signup_session", "email": "you@example.com", "status": "otp_sent" }
+```
 
-# Check your inbox for the 6-digit code, then:
+Check your inbox for the 6-digit code, then:
 
+```bash
 # 1b. Verify and get API key
-resp = httpx.post(
-    f"{BASE}/v1/account/verify",
-    json={"email": "you@example.com", "code": "123456"},
-)
-data = resp.json()
-
-api_key = data["api_key"]           # lb_...
-account = data["account"]           # account object
-print(f"API key: {api_key}")
-print(f"Account: {account['id']}")  # acc_...
+curl -X POST https://api.listbee.so/v1/auth/otp/verify \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com", "code": "123456"}'
+# → 201 { "object": "signup_result", "account": { "id": "acc_..." }, "api_key": "lb_..." }
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee(); // no apiKey needed for signup
-
-// 1a. Request OTP
-await client.signup.create({ email: "you@example.com" });
-
-// Check your inbox for the 6-digit code, then:
-
-// 1b. Verify and get API key
-const result = await client.signup.verify({
-  email: "you@example.com",
-  code: "123456",
-});
-
-const apiKey = result.api_key;        // lb_...
-const account = result.account;       // account object
-console.log(`API key: ${apiKey}`);
-console.log(`Account: ${account.id}`); // acc_...
-```
-
-</CodeGroup>
 
 Store the API key — all subsequent requests use it as a Bearer token.
 
@@ -66,184 +35,102 @@ Store the API key — all subsequent requests use it as a Bearer token.
 
 ## Step 2: Connect Stripe
 
-Submit your Stripe secret key. ListBee stores it encrypted and uses it to process payments.
+Two options depending on whether you already have a Stripe account.
 
-<CodeGroup>
+### Option A: Submit a Stripe key (API-driven, no browser)
 
-```python title="Python"
-import httpx
-
-BASE = "https://api.listbee.so"
-API_KEY = "lb_..."  # from step 1
-
-resp = httpx.post(
-    f"{BASE}/v1/account/stripe-key",
-    headers={"Authorization": f"Bearer {API_KEY}"},
-    json={"secret_key": "sk_live_..."},
-)
-account = resp.json()
-
-print(account["readiness"]["operational"])  # True — ready to sell
+```bash
+curl -X POST https://api.listbee.so/v1/account/stripe-key \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"secret_key": "sk_live_..."}'
+# → 200 account object with readiness.operational: true
 ```
 
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
+### Option B: Stripe Connect onboarding (browser required)
 
-const client = new ListBee({ apiKey: "lb_..." }); // from step 1
-
-const account = await client.stripe.setKey({
-  secretKey: "sk_live_...",
-});
-
-console.log(account.readiness.operational); // true — ready to sell
+```bash
+curl -X POST https://api.listbee.so/v1/account/stripe/connect \
+  -H "Authorization: Bearer lb_..."
+# → 200 { "object": "stripe_connect_session", "url": "https://connect.stripe.com/..." }
 ```
 
-</CodeGroup>
-
-`readiness.operational` is `true` when Stripe is connected and the account can process payments.
-
-<Note>
-Don't have a Stripe account yet? Call `POST /v1/account/stripe/connect` to start a Stripe Connect onboarding flow. You'll get back a URL to complete setup in your browser.
-</Note>
-
-<Note>
-Payment is connected per-store. If you create additional stores later, each one connects its own Stripe account via `POST /v1/stores/{id}/stripe/connect`. See [Stores](/stores) for details.
-</Note>
+Open the URL in a browser to complete Stripe setup. After completion, `GET /v1/account` will show `readiness.operational: true`.
 
 ---
 
 ## Step 3: Create a listing
 
-Two required fields: `name` and `price` (in cents). What you add beyond that determines how fulfillment works.
+Create a draft, attach a deliverable, then publish.
 
-### Simple: managed fulfillment (digital content)
-
-Pass `deliverable` — ListBee delivers it automatically after payment.
-
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-BASE = "https://api.listbee.so"
-API_KEY = "lb_..."  # from step 1
-
-resp = httpx.post(
-    f"{BASE}/v1/listings",
-    headers={"Authorization": f"Bearer {API_KEY}"},
-    json={
-        "name": "Python Async Patterns",
-        "price": 1900,      # $19.00 in cents
-        "deliverable": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
-    },
-)
-listing = resp.json()
-
-print(listing["url"])                      # https://buy.listbee.so/r7kq2xy9
-print(listing["fulfillment"])              # managed
-print(listing["readiness"]["sellable"])    # True — buyers can purchase now
+```bash
+# 3a. Create a draft listing
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Python Async Patterns",
+    "price": 1900
+  }'
+# → 201 { "object": "listing", "id": "lst_...", "slug": "python-async-patterns", "status": "draft" }
 ```
 
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." }); // from step 1
-
-const listing = await client.listings.create({
-  name: "Python Async Patterns",
-  price: 1900,     // $19.00 in cents
-  deliverable: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
-});
-
-console.log(listing.url);                    // https://buy.listbee.so/r7kq2xy9
-console.log(listing.fulfillment);            // managed
-console.log(listing.readiness.sellable);     // true — buyers can purchase now
+```bash
+# 3b. Attach a deliverable (file upload or URL/text)
+curl -X PUT https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "url",
+    "value": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf"
+  }'
+# → 200 listing with deliverable attached, fulfillment: "managed"
 ```
 
-</CodeGroup>
-
-### Advanced: external fulfillment (your app delivers)
-
-Set `fulfillment: "external"` and register a webhook. ListBee collects payment and fires `order.paid` — your code handles delivery.
-
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-BASE = "https://api.listbee.so"
-API_KEY = "lb_..."
-
-# Register a webhook first
-httpx.post(
-    f"{BASE}/v1/webhooks",
-    headers={"Authorization": f"Bearer {API_KEY}"},
-    json={
-        "url": "https://yourapp.com/webhooks/listbee",
-        "events": ["order.paid"],
-    },
-)
-
-# Create an external listing
-resp = httpx.post(
-    f"{BASE}/v1/listings",
-    headers={"Authorization": f"Bearer {API_KEY}"},
-    json={
-        "name": "Custom Portrait Drawing",
-        "price": 4900,
-        "fulfillment": "external",
-        "checkout_schema": [
-            {"key": "style", "type": "select", "label": "Art style", "required": True, "options": ["Watercolor", "Pencil", "Digital"]},
-        ],
-    },
-)
-listing = resp.json()
-
-print(listing["url"])          # https://buy.listbee.so/custom-portrait
-print(listing["fulfillment"])  # external
+```bash
+# 3c. Publish — listing goes live
+curl -X POST https://api.listbee.so/v1/listings/lst_.../publish \
+  -H "Authorization: Bearer lb_..."
+# → 200 { "status": "published", "url": "https://buy.listbee.so/python-async-patterns", "readiness": { "sellable": true } }
 ```
 
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
+Share the `url` with buyers. When `readiness.sellable` is `true`, the listing is live and accepting payments.
 
-const client = new ListBee({ apiKey: "lb_..." });
+### External fulfillment (your app delivers)
 
-// Register a webhook first
-await client.webhooks.create({
-  url: "https://yourapp.com/webhooks/listbee",
-  events: ["order.paid"],
-});
+Skip the deliverable step. Register a webhook and publish without content — ListBee collects payment and fires `order.paid`.
 
-// Create an external listing
-const listing = await client.listings.create({
-  name: "Custom Portrait Drawing",
-  price: 4900,
-  fulfillment: "external",
-  checkoutSchema: [
-    { key: "style", type: "select", label: "Art style", required: true, options: ["Watercolor", "Pencil", "Digital"] },
-  ],
-});
+```bash
+# Register a webhook
+curl -X POST https://api.listbee.so/v1/webhooks \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Order notifications",
+    "url": "https://yourapp.com/webhooks/listbee",
+    "events": ["order.paid"]
+  }'
 
-console.log(listing.url);          // https://buy.listbee.so/custom-portrait
-console.log(listing.fulfillment);  // external
+# Create and publish (no deliverable = external fulfillment)
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Custom Portrait Drawing", "price": 4900}'
+
+curl -X POST https://api.listbee.so/v1/listings/lst_.../publish \
+  -H "Authorization: Bearer lb_..."
 ```
-
-</CodeGroup>
-
-The `url` is the product page. Share it with buyers. When `readiness.sellable` is `true`, the listing is live.
-
-If `sellable` is `false`, check `readiness.actions` — each action has a `code`, `kind` (`api` or `human`), and a `resolve` object with the exact endpoint or URL to fix it.
 
 ---
 
 ## What's next
 
 <Cards>
+  <Card title="Listing lifecycle" href="/listing-lifecycle">
+    Draft, published, paused — how listing states work.
+  </Card>
   <Card title="Fulfillment modes" href="/fulfillment-modes">
     Managed vs external — understand both delivery paths.
-  </Card>
-  <Card title="Listings" href="/listings">
-    Update deliverables, pricing, cover images. Manage listing status.
   </Card>
   <Card title="Readiness system" href="/readiness">
     How agents read and act on readiness signals.
@@ -251,41 +138,33 @@ If `sellable` is `false`, check `readiness.actions` — each action has a `code`
   <Card title="Webhooks" href="/webhooks">
     Get notified when orders are paid, fulfilled, or shipped.
   </Card>
-  <Card title="Python SDK" href="/python-sdk">
-    Typed client — `pip install listbee`.
-  </Card>
-  <Card title="TypeScript SDK" href="/typescript-sdk">
-    Typed client — `npm install listbee`.
-  </Card>
 </Cards>
 
 ---
 
 ## Copy for AI assistants
 
-```python
+```bash
 # ListBee quickstart — three steps from zero to a live listing
 #
 # Step 1: Account
-#   POST /v1/account/signup    { "email": "..." }
-#     → 200 { object, email, status, message }   (OTP sent)
-#   POST /v1/account/verify    { "email": "...", "code": "123456" }
-#     → 201 { object, account, api_key }
+#   POST /v1/auth/otp/start    { "email": "..." }       → OTP sent
+#   POST /v1/auth/otp/verify   { "email": "...", "code": "123456" }  → api_key
 #
-# Step 2: Stripe
-#   POST /v1/account/stripe-key  { "secret_key": "sk_live_..." }
-#     → 200 account object with readiness.operational: true
+# Step 2: Stripe (pick one)
+#   POST /v1/account/stripe-key       { "secret_key": "sk_live_..." }  → operational
+#   POST /v1/account/stripe/connect   → { "url": "https://connect.stripe.com/..." }
 #
-# Step 3a: Managed listing (digital content — ListBee delivers)
-#   POST /v1/listings  { "name", "price" (cents), "deliverable" }
-#     → 201 { fulfillment: "managed", deliverable_type: "file"|"url"|"text", ... }
+# Step 3: Listing (draft → deliverable → publish)
+#   POST /v1/listings                          { name, price }           → draft
+#   PUT  /v1/listings/{id}/deliverable         { type, value/token }     → managed
+#   POST /v1/listings/{id}/publish             → published, sellable
 #
-# Step 3b: External listing (your app delivers)
-#   POST /v1/webhooks  { "url": "https://...", "events": ["order.paid"] }
-#   POST /v1/listings  { "name", "price", "fulfillment": "external", "checkout_schema"?: [...] }
-#     → 201 { fulfillment: "external", deliverable_type: null, ... }
+# External (no deliverable):
+#   POST /v1/webhooks  { name, url, events: ["order.paid"] }
+#   POST /v1/listings  { name, price }  → POST .../publish
 #
-# All requests: Authorization: Bearer lb_...
-# Errors:       RFC 9457 { type, title, status, detail, code, param }
-# Docs:         https://docs.listbee.so
+# Auth: Authorization: Bearer lb_...
+# Errors: RFC 9457 { type, title, status, detail, code, param }
+# Docs: https://docs.listbee.so
 ```

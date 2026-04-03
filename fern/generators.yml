@@ -2,3 +2,4 @@ api:
   specs:
     - openapi: openapi/openapi.json
       origin: https://api.listbee.so/openapi.json
+      overrides: openapi/ai_examples_override.yml

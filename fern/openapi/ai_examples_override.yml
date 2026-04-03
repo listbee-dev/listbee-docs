@@ -18,7 +18,7 @@ paths:
             body:
               object: stripe_connect_session
               url: https://connect.stripe.com/setup/s/acct_1Gqj58Lz0qyl6XeW
-              expires_at: '2024-07-01T12:00:00Z'
+              expires_at: '2026-04-03T16:00:00Z'
   /v1/webhooks/webhook_id/events:
     get:
       x-fern-examples:
@@ -30,46 +30,42 @@ paths:
               data:
                 - object: webhook_event
                   id: evt_7kQ2xY9mN3pR5tW1
-                  event_type: order.completed
+                  event_type: order.paid
                   status: delivered
                   attempts: 1
                   max_retries: 5
                   response_status: 200
                   last_error: null
-                  created_at: '2024-01-15T09:30:00Z'
-                  delivered_at: '2024-01-15T09:30:00Z'
+                  created_at: '2026-04-03T14:30:00Z'
+                  delivered_at: '2026-04-03T14:30:01Z'
+                  failed_at: null
+                  next_retry_at: null
                 - object: webhook_event
                   id: evt_9mL4vZ7pQ2rT8xY3
-                  event_type: order.refunded
+                  event_type: order.fulfilled
                   status: failed
                   attempts: 5
                   max_retries: 5
                   response_status: 500
                   last_error: Internal Server Error
-                  created_at: '2024-01-14T16:45:00Z'
+                  created_at: '2026-04-02T16:45:00Z'
                   delivered_at: null
+                  failed_at: '2026-04-03T04:45:00Z'
+                  next_retry_at: null
                 - object: webhook_event
                   id: evt_5nJ3wX8kR1sV6yZ2
-                  event_type: listing.created
+                  event_type: order.canceled
                   status: pending
                   attempts: 2
                   max_retries: 5
                   response_status: null
-                  last_error: null
-                  created_at: '2024-01-16T11:20:00Z'
+                  last_error: Connection timeout
+                  created_at: '2026-04-03T11:20:00Z'
                   delivered_at: null
+                  failed_at: null
+                  next_retry_at: '2026-04-03T12:20:00Z'
               cursor: evt_5nJ3wX8kR1sV6yZ2
               has_more: true
-  /v1/stores/store_id/stripe/connect:
-    post:
-      x-fern-examples:
-        - path-parameters:
-            store_id: store_id
-          response:
-            body:
-              object: stripe_connect_session
-              url: https://connect.stripe.com/setup/s/acct_1Gqj58Lz0qyl6XeW
-              expires_at: '2024-07-01T12:00:00Z'
   /v1/orders/order_id:
     get:
       x-fern-examples:
@@ -84,7 +80,9 @@ paths:
               amount: 2900
               currency: USD
               status: paid
-              checkout_data: {}
+              checkout_data:
+                size: M
+                note: Gift wrap please
               shipping_address:
                 name: Jane Doe
                 line1: 123 Maple Street
@@ -94,14 +92,15 @@ paths:
                 postal_code: '62704'
                 country: US
                 phone: '+12175551234'
-              fulfillment_status: fulfilled
+              deliverable: null
               carrier: USPS
               tracking_code: '9400111899223456789012'
-              seller_note: Thank you for your purchase! Your digital content is attached.
+              seller_note: Ships within 2 business days
               stripe_payment_intent_id: pi_3abc123def456
-              paid_at: '2024-01-15T09:30:00Z'
-              fulfilled_at: '2024-01-15T10:00:00Z'
-              created_at: '2024-01-15T09:00:00Z'
+              shipped_at: '2026-04-02T16:00:00Z'
+              paid_at: '2026-04-02T14:30:00Z'
+              fulfilled_at: '2026-04-02T15:00:00Z'
+              created_at: '2026-04-02T14:00:00Z'
   /v1/orders/order_id/fulfill:
     post:
       x-fern-examples:
@@ -115,25 +114,26 @@ paths:
               buyer_email: jane.doe@example.com
               amount: 2900
               currency: USD
-              status: paid
+              status: fulfilled
               checkout_data: {}
-              shipping_address:
-                name: Jane Doe
-                line1: 123 Maple Street
-                line2: Apt 4B
-                city: Springfield
-                state: IL
-                postal_code: '62704'
-                country: US
-                phone: '+12175551234'
-              fulfillment_status: fulfilled
-              carrier: USPS
-              tracking_code: '9400111899223456789012'
-              seller_note: Thank you for your purchase! Your order has been shipped.
+              shipping_address: null
+              deliverable:
+                object: deliverable
+                type: url
+                status: ready
+                filename: null
+                size: null
+                mime_type: null
+                url: https://example.com/generated-report.pdf
+                content: null
+              carrier: null
+              tracking_code: null
+              seller_note: null
               stripe_payment_intent_id: pi_3abc123def456
-              paid_at: '2024-01-15T09:30:00Z'
-              fulfilled_at: '2024-01-16T14:45:00Z'
-              created_at: '2024-01-14T08:00:00Z'
+              shipped_at: null
+              paid_at: '2026-04-02T14:30:00Z'
+              fulfilled_at: '2026-04-02T15:00:00Z'
+              created_at: '2026-04-02T14:00:00Z'
   /v1/orders/order_id/ship:
     post:
       x-fern-examples:
@@ -151,7 +151,8 @@ paths:
               amount: 2900
               currency: USD
               status: paid
-              checkout_data: {}
+              checkout_data:
+                shoe_size: '10'
               shipping_address:
                 name: Jane Doe
                 line1: 123 Maple Street
@@ -161,14 +162,15 @@ paths:
                 postal_code: '62704'
                 country: US
                 phone: '+12175551234'
-              fulfillment_status: fulfilled
+              deliverable: null
               carrier: FedEx
               tracking_code: '123456789012'
               seller_note: Package shipped via FedEx Ground, expected delivery in 3-5 business days.
               stripe_payment_intent_id: pi_3abc123def456
-              paid_at: '2024-01-15T09:30:00Z'
-              fulfilled_at: '2024-01-16T14:45:00Z'
-              created_at: '2024-01-14T08:00:00Z'
+              shipped_at: '2026-04-02T16:00:00Z'
+              paid_at: '2026-04-02T14:30:00Z'
+              fulfilled_at: null
+              created_at: '2026-04-02T14:00:00Z'
   /v1/orders:
     get:
       x-fern-examples:
@@ -183,7 +185,8 @@ paths:
                   amount: 2900
                   currency: USD
                   status: paid
-                  checkout_data: {}
+                  checkout_data:
+                    size: M
                   shipping_address:
                     name: Jane Doe
                     line1: 123 Maple Street
@@ -193,14 +196,15 @@ paths:
                     postal_code: '62704'
                     country: US
                     phone: '+12175551234'
-                  fulfillment_status: fulfilled
+                  deliverable: null
                   carrier: USPS
                   tracking_code: '9400111899223456789012'
-                  seller_note: Thank you for your purchase! Please contact us if you have any questions.
+                  seller_note: Ships within 2 business days
                   stripe_payment_intent_id: pi_3abc123def456
-                  paid_at: '2024-01-15T09:30:00Z'
-                  fulfilled_at: '2024-01-16T14:45:00Z'
-                  created_at: '2024-01-15T08:55:00Z'
+                  shipped_at: '2026-04-02T16:00:00Z'
+                  paid_at: '2026-04-02T14:30:00Z'
+                  fulfilled_at: '2026-04-02T15:00:00Z'
+                  created_at: '2026-04-02T14:00:00Z'
               total_count: 47
-              cursor: eyJvcmRlcl9pZCI6Im9yZF85eE00a1A3blIyZVQ1d1kxIn0=
+              cursor: ord_9xM4kP7nR2qT5wY1
               has_more: false

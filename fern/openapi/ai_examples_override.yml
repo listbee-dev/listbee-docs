@@ -1,5 +1,499 @@
 paths:
-  /v1/webhooks/webhook_id/test:
+  # --- Auth ---
+  /v1/auth/otp/start:
+    post:
+      x-fern-examples:
+        - request:
+            email: seller@example.com
+          response:
+            body:
+              object: signup_session
+              email: seller@example.com
+              status: otp_sent
+              message: Check your email for a 6-digit verification code.
+  /v1/auth/otp/verify:
+    post:
+      x-fern-examples:
+        - request:
+            email: seller@example.com
+            code: '482901'
+          response:
+            body:
+              object: signup_result
+              account:
+                object: account
+                id: acc_7kQ2xY9mN3pR5tW1
+                email: seller@example.com
+                plan: free
+                fee_rate: '0.10'
+                currency: usd
+                ga_measurement_id: null
+                stats:
+                  total_revenue: 0
+                  total_orders: 0
+                  total_listings: 0
+                readiness:
+                  operational: false
+                  actions:
+                    - code: connect_stripe
+                      kind: api
+                      message: Connect Stripe account to accept payments.
+                      resolve:
+                        method: POST
+                        endpoint: /v1/account/stripe/connect
+                        url: null
+                        params: null
+                  next: connect_stripe
+                created_at: '2026-04-03T10:00:00Z'
+              api_key: lb_abc123def456ghi789jkl012mno345
+
+  # --- Account ---
+  /v1/account:
+    get:
+      x-fern-examples:
+        - response:
+            body:
+              object: account
+              id: acc_7kQ2xY9mN3pR5tW1
+              email: seller@example.com
+              plan: growth
+              fee_rate: '0.05'
+              currency: usd
+              ga_measurement_id: G-ABC123XYZ
+              stats:
+                total_revenue: 145000
+                total_orders: 47
+                total_listings: 12
+              readiness:
+                operational: true
+                actions: []
+                next: null
+              created_at: '2026-03-15T10:00:00Z'
+    put:
+      x-fern-examples:
+        - request:
+            ga_measurement_id: G-ABC123XYZ
+          response:
+            body:
+              object: account
+              id: acc_7kQ2xY9mN3pR5tW1
+              email: seller@example.com
+              plan: growth
+              fee_rate: '0.05'
+              currency: usd
+              ga_measurement_id: G-ABC123XYZ
+              stats:
+                total_revenue: 145000
+                total_orders: 47
+                total_listings: 12
+              readiness:
+                operational: true
+                actions: []
+                next: null
+              created_at: '2026-03-15T10:00:00Z'
+
+  # --- API Keys ---
+  /v1/api-keys:
+    get:
+      x-fern-examples:
+        - response:
+            body:
+              object: list
+              data:
+                - object: api_key
+                  id: ak_7kQ2xY9mN3pR5tW1vB8a
+                  name: n8n production
+                  prefix: lb_abc12
+                  key: null
+                  created_at: '2026-04-01T10:00:00Z'
+                - object: api_key
+                  id: ak_3mK8nP2qR5tW7xY1zC4b
+                  name: claude-code
+                  prefix: lb_def34
+                  key: null
+                  created_at: '2026-04-02T14:00:00Z'
+              has_more: false
+              cursor: null
+    post:
+      x-fern-examples:
+        - request:
+            name: n8n production
+          response:
+            body:
+              object: api_key
+              id: ak_7kQ2xY9mN3pR5tW1vB8a
+              name: n8n production
+              prefix: lb_abc12
+              key: lb_abc123def456ghi789jkl012mno345
+              created_at: '2026-04-03T10:00:00Z'
+
+  # --- Files ---
+  /v1/files:
+    post:
+      x-fern-examples:
+        - response:
+            body:
+              object: file
+              id: file_7kQ2xY9mN3pR5tW1vB8a01
+              filename: ebook.pdf
+              size: 2458631
+              mime_type: application/pdf
+              purpose: deliverable
+              expires_at: '2026-04-03T15:00:00Z'
+              created_at: '2026-04-03T14:00:00Z'
+
+  # --- Listings ---
+  /v1/listings:
+    post:
+      x-fern-examples:
+        - request:
+            name: SEO Playbook 2026
+            price: 2900
+            description: A comprehensive guide to modern SEO techniques.
+            tagline: Updated for 2026 algorithm changes
+            highlights:
+              - 50+ pages
+              - Actionable tips
+              - Free updates
+            cta: Get Instant Access
+            badges:
+              - Best seller
+          response:
+            body:
+              object: listing
+              id: lst_7kQ2xY9mN3pR5tW1vB8a
+              slug: seo-playbook-2026
+              name: SEO Playbook 2026
+              description: A comprehensive guide to modern SEO techniques.
+              tagline: Updated for 2026 algorithm changes
+              highlights:
+                - 50+ pages
+                - Actionable tips
+                - Free updates
+              cta: Get Instant Access
+              price: 2900
+              deliverable: null
+              has_deliverable: false
+              fulfillment: external
+              checkout_schema: null
+              has_cover: false
+              compare_at_price: null
+              badges:
+                - Best seller
+              cover_blur: auto
+              rating: null
+              rating_count: null
+              reviews: []
+              faqs: []
+              metadata: null
+              utm_source: null
+              utm_medium: null
+              utm_campaign: null
+              status: draft
+              url: https://buy.listbee.so/seo-playbook-2026
+              readiness:
+                sellable: false
+                actions:
+                  - code: publish_listing
+                    kind: api
+                    message: Publish to make this listing live and buyable.
+                    resolve:
+                      method: POST
+                      endpoint: /v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/publish
+                      url: null
+                      params: null
+                next: publish_listing
+              created_at: '2026-04-03T10:00:00Z'
+    get:
+      x-fern-examples:
+        - response:
+            body:
+              object: list
+              data:
+                - object: listing
+                  id: lst_7kQ2xY9mN3pR5tW1vB8a
+                  slug: seo-playbook-2026
+                  name: SEO Playbook 2026
+                  description: A comprehensive guide to modern SEO techniques.
+                  tagline: Updated for 2026 algorithm changes
+                  highlights:
+                    - 50+ pages
+                    - Actionable tips
+                  cta: Get Instant Access
+                  price: 2900
+                  deliverable:
+                    object: deliverable
+                    type: file
+                    status: ready
+                    filename: ebook.pdf
+                    size: 2458631
+                    mime_type: application/pdf
+                    url: null
+                    content: null
+                  has_deliverable: true
+                  fulfillment: managed
+                  checkout_schema: null
+                  has_cover: true
+                  compare_at_price: 3900
+                  badges:
+                    - Best seller
+                  cover_blur: auto
+                  rating: 4.8
+                  rating_count: 1243
+                  reviews: []
+                  faqs: []
+                  metadata:
+                    source: n8n
+                  utm_source: google
+                  utm_medium: cpc
+                  utm_campaign: spring-sale
+                  status: published
+                  url: https://buy.listbee.so/seo-playbook-2026
+                  readiness:
+                    sellable: true
+                    actions: []
+                    next: null
+                  created_at: '2026-04-01T12:00:00Z'
+              total_count: 12
+              cursor: lst_7kQ2xY9mN3pR5tW1vB8a
+              has_more: false
+  /v1/listings/{listing_id}:
+    get:
+      x-fern-examples:
+        - path-parameters:
+            listing_id: listing_id
+          response:
+            body:
+              object: listing
+              id: lst_7kQ2xY9mN3pR5tW1vB8a
+              slug: seo-playbook-2026
+              name: SEO Playbook 2026
+              description: A comprehensive guide to modern SEO techniques.
+              tagline: Updated for 2026 algorithm changes
+              highlights:
+                - 50+ pages
+                - Actionable tips
+                - Free updates
+              cta: Get Instant Access
+              price: 2900
+              deliverable:
+                object: deliverable
+                type: file
+                status: ready
+                filename: ebook.pdf
+                size: 2458631
+                mime_type: application/pdf
+                url: null
+                content: null
+              has_deliverable: true
+              fulfillment: managed
+              checkout_schema: null
+              has_cover: true
+              compare_at_price: 3900
+              badges:
+                - Best seller
+              cover_blur: auto
+              rating: 4.8
+              rating_count: 1243
+              reviews: []
+              faqs: []
+              metadata:
+                source: n8n
+              utm_source: google
+              utm_medium: cpc
+              utm_campaign: spring-sale
+              status: published
+              url: https://buy.listbee.so/seo-playbook-2026
+              readiness:
+                sellable: true
+                actions: []
+                next: null
+              created_at: '2026-04-01T12:00:00Z'
+    put:
+      x-fern-examples:
+        - path-parameters:
+            listing_id: listing_id
+          request:
+            name: SEO Playbook 2026 (Updated)
+            price: 3900
+            tagline: Now with AI-powered SEO strategies
+          response:
+            body:
+              object: listing
+              id: lst_7kQ2xY9mN3pR5tW1vB8a
+              slug: seo-playbook-2026
+              name: SEO Playbook 2026 (Updated)
+              description: A comprehensive guide to modern SEO techniques.
+              tagline: Now with AI-powered SEO strategies
+              highlights:
+                - 50+ pages
+                - Actionable tips
+                - Free updates
+              cta: Get Instant Access
+              price: 3900
+              deliverable:
+                object: deliverable
+                type: file
+                status: ready
+                filename: ebook.pdf
+                size: 2458631
+                mime_type: application/pdf
+                url: null
+                content: null
+              has_deliverable: true
+              fulfillment: managed
+              checkout_schema: null
+              has_cover: true
+              compare_at_price: 4900
+              badges:
+                - Best seller
+              cover_blur: auto
+              rating: 4.8
+              rating_count: 1243
+              reviews: []
+              faqs: []
+              metadata:
+                source: n8n
+              utm_source: google
+              utm_medium: cpc
+              utm_campaign: spring-sale
+              status: published
+              url: https://buy.listbee.so/seo-playbook-2026
+              readiness:
+                sellable: true
+                actions: []
+                next: null
+              created_at: '2026-04-01T12:00:00Z'
+  /v1/listings/{listing_id}/deliverable:
+    put:
+      x-fern-examples:
+        - path-parameters:
+            listing_id: listing_id
+          request:
+            type: file
+            token: file_7kQ2xY9mN3pR5tW1vB8a01
+          response:
+            body:
+              object: listing
+              id: lst_7kQ2xY9mN3pR5tW1vB8a
+              slug: seo-playbook-2026
+              name: SEO Playbook 2026
+              description: A comprehensive guide to modern SEO techniques.
+              tagline: Updated for 2026 algorithm changes
+              highlights:
+                - 50+ pages
+                - Actionable tips
+              cta: Get Instant Access
+              price: 2900
+              deliverable:
+                object: deliverable
+                type: file
+                status: ready
+                filename: ebook.pdf
+                size: 2458631
+                mime_type: application/pdf
+                url: null
+                content: null
+              has_deliverable: true
+              fulfillment: managed
+              checkout_schema: null
+              has_cover: true
+              compare_at_price: null
+              badges: []
+              cover_blur: auto
+              rating: null
+              rating_count: null
+              reviews: []
+              faqs: []
+              metadata: null
+              utm_source: null
+              utm_medium: null
+              utm_campaign: null
+              status: draft
+              url: https://buy.listbee.so/seo-playbook-2026
+              readiness:
+                sellable: false
+                actions:
+                  - code: publish_listing
+                    kind: api
+                    message: Publish to make this listing live and buyable.
+                    resolve:
+                      method: POST
+                      endpoint: /v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/publish
+                      url: null
+                      params: null
+                next: publish_listing
+              created_at: '2026-04-03T10:00:00Z'
+
+  # --- Webhooks ---
+  /v1/webhooks:
+    get:
+      x-fern-examples:
+        - response:
+            body:
+              object: list
+              data:
+                - object: webhook
+                  id: wh_3mK8nP2qR5tW7xY1
+                  name: Order notifications
+                  url: https://example.com/webhooks/listbee
+                  secret: whsec_a1b...f6g2
+                  events:
+                    - order.paid
+                  enabled: true
+                  disabled_reason: null
+                  readiness:
+                    ready: true
+                    actions: []
+                    next: null
+                  created_at: '2026-04-01T09:00:00Z'
+    post:
+      x-fern-examples:
+        - request:
+            name: Order notifications
+            url: https://example.com/webhooks/listbee
+            events:
+              - order.paid
+          response:
+            body:
+              object: webhook
+              id: wh_3mK8nP2qR5tW7xY1
+              name: Order notifications
+              url: https://example.com/webhooks/listbee
+              secret: whsec_a1b2c3d4e5f6g7h8i9j0
+              events:
+                - order.paid
+              enabled: true
+              disabled_reason: null
+              readiness:
+                ready: true
+                actions: []
+                next: null
+              created_at: '2026-04-03T10:00:00Z'
+  /v1/webhooks/{webhook_id}:
+    put:
+      x-fern-examples:
+        - path-parameters:
+            webhook_id: webhook_id
+          request:
+            name: All events
+            events: []
+          response:
+            body:
+              object: webhook
+              id: wh_3mK8nP2qR5tW7xY1
+              name: All events
+              url: https://example.com/webhooks/listbee
+              secret: whsec_a1b...f6g2
+              events: []
+              enabled: true
+              disabled_reason: null
+              readiness:
+                ready: true
+                actions: []
+                next: null
+              created_at: '2026-04-01T09:00:00Z'
+  /v1/webhooks/{webhook_id}/test:
     post:
       x-fern-examples:
         - path-parameters:
@@ -11,15 +505,7 @@ paths:
               status_code: 200
               response_body: Webhook received successfully
               error: null
-  /v1/account/stripe/connect:
-    post:
-      x-fern-examples:
-        - response:
-            body:
-              object: stripe_connect_session
-              url: https://connect.stripe.com/setup/s/acct_1Gqj58Lz0qyl6XeW
-              expires_at: '2026-04-03T16:00:00Z'
-  /v1/webhooks/webhook_id/events:
+  /v1/webhooks/{webhook_id}/events:
     get:
       x-fern-examples:
         - path-parameters:
@@ -52,125 +538,20 @@ paths:
                   delivered_at: null
                   failed_at: '2026-04-03T04:45:00Z'
                   next_retry_at: null
-                - object: webhook_event
-                  id: evt_5nJ3wX8kR1sV6yZ2
-                  event_type: order.canceled
-                  status: pending
-                  attempts: 2
-                  max_retries: 5
-                  response_status: null
-                  last_error: Connection timeout
-                  created_at: '2026-04-03T11:20:00Z'
-                  delivered_at: null
-                  failed_at: null
-                  next_retry_at: '2026-04-03T12:20:00Z'
-              cursor: evt_5nJ3wX8kR1sV6yZ2
+              cursor: evt_9mL4vZ7pQ2rT8xY3
               has_more: true
-  /v1/orders/order_id:
-    get:
-      x-fern-examples:
-        - path-parameters:
-            order_id: order_id
-          response:
-            body:
-              object: order
-              id: ord_9xM4kP7nR2qT5wY1
-              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
-              buyer_email: jane.doe@example.com
-              amount: 2900
-              currency: USD
-              status: paid
-              checkout_data:
-                size: M
-                note: Gift wrap please
-              shipping_address:
-                name: Jane Doe
-                line1: 123 Maple Street
-                line2: Apt 4B
-                city: Springfield
-                state: IL
-                postal_code: '62704'
-                country: US
-                phone: '+12175551234'
-              deliverable: null
-              carrier: USPS
-              tracking_code: '9400111899223456789012'
-              seller_note: Ships within 2 business days
-              stripe_payment_intent_id: pi_3abc123def456
-              shipped_at: '2026-04-02T16:00:00Z'
-              paid_at: '2026-04-02T14:30:00Z'
-              fulfilled_at: '2026-04-02T15:00:00Z'
-              created_at: '2026-04-02T14:00:00Z'
-  /v1/orders/order_id/fulfill:
+
+  # --- Stripe ---
+  /v1/account/stripe/connect:
     post:
       x-fern-examples:
-        - path-parameters:
-            order_id: order_id
-          response:
+        - response:
             body:
-              object: order
-              id: ord_9xM4kP7nR2qT5wY1
-              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
-              buyer_email: jane.doe@example.com
-              amount: 2900
-              currency: USD
-              status: fulfilled
-              checkout_data: {}
-              shipping_address: null
-              deliverable:
-                object: deliverable
-                type: url
-                status: ready
-                filename: null
-                size: null
-                mime_type: null
-                url: https://example.com/generated-report.pdf
-                content: null
-              carrier: null
-              tracking_code: null
-              seller_note: null
-              stripe_payment_intent_id: pi_3abc123def456
-              shipped_at: null
-              paid_at: '2026-04-02T14:30:00Z'
-              fulfilled_at: '2026-04-02T15:00:00Z'
-              created_at: '2026-04-02T14:00:00Z'
-  /v1/orders/order_id/ship:
-    post:
-      x-fern-examples:
-        - path-parameters:
-            order_id: order_id
-          request:
-            carrier: FedEx
-            tracking_code: '123456789012'
-          response:
-            body:
-              object: order
-              id: ord_9xM4kP7nR2qT5wY1
-              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
-              buyer_email: jane.doe@example.com
-              amount: 2900
-              currency: USD
-              status: paid
-              checkout_data:
-                shoe_size: '10'
-              shipping_address:
-                name: Jane Doe
-                line1: 123 Maple Street
-                line2: Apt 4B
-                city: Springfield
-                state: IL
-                postal_code: '62704'
-                country: US
-                phone: '+12175551234'
-              deliverable: null
-              carrier: FedEx
-              tracking_code: '123456789012'
-              seller_note: Package shipped via FedEx Ground, expected delivery in 3-5 business days.
-              stripe_payment_intent_id: pi_3abc123def456
-              shipped_at: '2026-04-02T16:00:00Z'
-              paid_at: '2026-04-02T14:30:00Z'
-              fulfilled_at: null
-              created_at: '2026-04-02T14:00:00Z'
+              object: stripe_connect_session
+              url: https://connect.stripe.com/setup/s/acct_1Gqj58Lz0qyl6XeW
+              expires_at: '2026-04-03T16:00:00Z'
+
+  # --- Orders ---
   /v1/orders:
     get:
       x-fern-examples:
@@ -208,3 +589,108 @@ paths:
               total_count: 47
               cursor: ord_9xM4kP7nR2qT5wY1
               has_more: false
+  /v1/orders/{order_id}:
+    get:
+      x-fern-examples:
+        - path-parameters:
+            order_id: order_id
+          response:
+            body:
+              object: order
+              id: ord_9xM4kP7nR2qT5wY1
+              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+              buyer_email: jane.doe@example.com
+              amount: 2900
+              currency: USD
+              status: paid
+              checkout_data:
+                size: M
+                note: Gift wrap please
+              shipping_address:
+                name: Jane Doe
+                line1: 123 Maple Street
+                line2: Apt 4B
+                city: Springfield
+                state: IL
+                postal_code: '62704'
+                country: US
+                phone: '+12175551234'
+              deliverable: null
+              carrier: USPS
+              tracking_code: '9400111899223456789012'
+              seller_note: Ships within 2 business days
+              stripe_payment_intent_id: pi_3abc123def456
+              shipped_at: '2026-04-02T16:00:00Z'
+              paid_at: '2026-04-02T14:30:00Z'
+              fulfilled_at: '2026-04-02T15:00:00Z'
+              created_at: '2026-04-02T14:00:00Z'
+  /v1/orders/{order_id}/fulfill:
+    post:
+      x-fern-examples:
+        - path-parameters:
+            order_id: order_id
+          response:
+            body:
+              object: order
+              id: ord_9xM4kP7nR2qT5wY1
+              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+              buyer_email: jane.doe@example.com
+              amount: 2900
+              currency: USD
+              status: fulfilled
+              checkout_data: {}
+              shipping_address: null
+              deliverable:
+                object: deliverable
+                type: url
+                status: ready
+                filename: null
+                size: null
+                mime_type: null
+                url: https://example.com/generated-report.pdf
+                content: null
+              carrier: null
+              tracking_code: null
+              seller_note: null
+              stripe_payment_intent_id: pi_3abc123def456
+              shipped_at: null
+              paid_at: '2026-04-02T14:30:00Z'
+              fulfilled_at: '2026-04-02T15:00:00Z'
+              created_at: '2026-04-02T14:00:00Z'
+  /v1/orders/{order_id}/ship:
+    post:
+      x-fern-examples:
+        - path-parameters:
+            order_id: order_id
+          request:
+            carrier: FedEx
+            tracking_code: '123456789012'
+          response:
+            body:
+              object: order
+              id: ord_9xM4kP7nR2qT5wY1
+              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+              buyer_email: jane.doe@example.com
+              amount: 2900
+              currency: USD
+              status: paid
+              checkout_data:
+                shoe_size: '10'
+              shipping_address:
+                name: Jane Doe
+                line1: 123 Maple Street
+                line2: Apt 4B
+                city: Springfield
+                state: IL
+                postal_code: '62704'
+                country: US
+                phone: '+12175551234'
+              deliverable: null
+              carrier: FedEx
+              tracking_code: '123456789012'
+              seller_note: Package shipped via FedEx Ground, expected delivery in 3-5 business days.
+              stripe_payment_intent_id: pi_3abc123def456
+              shipped_at: '2026-04-02T16:00:00Z'
+              paid_at: '2026-04-02T14:30:00Z'
+              fulfilled_at: null
+              created_at: '2026-04-02T14:00:00Z'

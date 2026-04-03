@@ -16,7 +16,10 @@ jobs:
 
       - name: Sync OpenAPI spec from production
         if: github.event_name == 'repository_dispatch'
-        run: curl -sf https://api.listbee.so/openapi.json > fern/openapi/openapi.json
+        run: |
+          curl -sf https://api.listbee.so/openapi.json > fern/openapi/openapi.json
+          pip install pyyaml -q
+          python scripts/generate_overrides.py
 
       - name: Install Fern
         run: npm install -g fern-api

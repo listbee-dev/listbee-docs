@@ -14,6 +14,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Sync OpenAPI spec from production
+        if: github.event_name == 'repository_dispatch'
+        run: curl -sf https://api.listbee.so/openapi.json > fern/openapi/openapi.json
+
       - name: Install Fern
         run: npm install -g fern-api
 

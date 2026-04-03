@@ -3,196 +3,169 @@ title: Listings
 description: Create and manage priced products with hosted product pages — digital downloads, physical goods, or custom services.
 ---
 
-A listing is a priced product with a hosted product page. Create one with a name, price, and optional deliverable — ListBee generates a URL you can share with buyers.
+A listing is a priced product with a hosted product page. Create one with a name and price — ListBee generates a slug from the name and a product page URL.
 
-Each listing has a `readiness.sellable` flag. When `true`, buyers can purchase immediately. When `false`, `readiness.actions` tells you exactly what to fix. See the [Readiness system](/readiness) for full details.
+Listings start as **drafts**. Attach a deliverable, then publish to go live. See [Listing lifecycle](/listing-lifecycle) for full state details.
 
 ---
 
 ## Create a listing
 
-`POST /v1/listings` requires `name` and `price` (in cents). Currency is determined by your account settings.
+`POST /v1/listings` requires `name` and `price` (in minor currency units — cents for USD). Returns a draft listing.
 
-### Managed fulfillment (digital content)
-
-Pass `deliverable` — a URL pointing to a file, a redirect URL, or a plain-text string. ListBee detects the deliverable type and handles delivery automatically.
-
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/listings",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "name": "Python Async Patterns",
-        "price": 1900,      # $19.00 in cents
-        "deliverable": "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
-    },
-)
-listing = resp.json()
-
-print(listing["url"])                    # https://buy.listbee.so/r7kq2xy9
-print(listing["fulfillment"])            # managed
-print(listing["deliverable_type"])       # file
-print(listing["readiness"]["sellable"])  # True
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Python Async Patterns",
+    "price": 1900
+  }'
 ```
 
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
+Response:
 
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.create({
-  name: "Python Async Patterns",
-  price: 1900,     // $19.00 in cents
-  deliverable: "https://your-bucket.s3.amazonaws.com/python-async-patterns.pdf",
-});
-
-console.log(listing.url);                   // https://buy.listbee.so/r7kq2xy9
-console.log(listing.fulfillment);           // managed
-console.log(listing.deliverable_type);      // file
-console.log(listing.readiness.sellable);    // true
+```json
+{
+  "object": "listing",
+  "id": "lst_...",
+  "slug": "python-async-patterns",
+  "name": "Python Async Patterns",
+  "price": 1900,
+  "status": "draft",
+  "fulfillment": "external",
+  "has_deliverable": false,
+  "url": "https://buy.listbee.so/python-async-patterns",
+  "readiness": {
+    "sellable": false,
+    "actions": [...],
+    "next": "publish_listing"
+  }
+}
 ```
 
-</CodeGroup>
-
-### External fulfillment (your app delivers)
-
-Set `fulfillment: "external"` — no deliverable needed. Add a `checkout_schema` to collect buyer information (address, preferences, etc.).
-
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.post(
-    "https://api.listbee.so/v1/listings",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "name": "Handmade Leather Boots",
-        "price": 18900,
-        "fulfillment": "external",
-        "checkout_schema": [
-            {"key": "size", "type": "select", "label": "Shoe size", "required": True, "options": ["EU 38", "EU 39", "EU 40", "EU 41", "EU 42"]},
-            {"key": "shipping_address", "type": "address", "label": "Shipping address", "required": True},
-        ],
-    },
-)
-listing = resp.json()
-
-print(listing["fulfillment"])            # external
-print(listing["deliverable_type"])       # None
-print(listing["readiness"]["sellable"])  # True (if webhook configured)
-```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.create({
-  name: "Handmade Leather Boots",
-  price: 18900,
-  fulfillment: "external",
-  checkoutSchema: [
-    { key: "size", type: "select", label: "Shoe size", required: true, options: ["EU 38", "EU 39", "EU 40", "EU 41", "EU 42"] },
-    { key: "shipping_address", type: "address", label: "Shipping address", required: true },
-  ],
-});
-
-console.log(listing.fulfillment);           // external
-console.log(listing.deliverable_type);      // null
-console.log(listing.readiness.sellable);    // true (if webhook configured)
-```
-
-</CodeGroup>
-
-For multi-store accounts, pass `store_id` to assign the listing to a specific store. Single-store accounts can omit it.
+The slug is derived from the name. Conflicts get a random suffix (e.g. `python-async-patterns-k3f`). Slugs can be changed while in draft — frozen after first publish.
 
 ---
 
-## Deliverable types
+## Set a deliverable
 
-ListBee detects deliverable type from the `deliverable` field:
+Attach digital content to make the listing use managed fulfillment. Three types:
 
-| Type | What you provide | What happens (managed) |
-|------|-----------------|----------------------|
-| `FILE` | A URL ending in a file extension (`.pdf`, `.zip`, etc.) | File fetched and hosted on CDN. Buyers receive a signed URL. |
-| `URL` | Any other URL | After payment, buyers are redirected to the URL. |
-| `TEXT` | A plain string (no `http://` prefix) | Inline content delivered in the order confirmation. |
-| `null` | No deliverable (external fulfillment) | Your app handles delivery. |
+| Type | Input | What happens after purchase |
+|------|-------|---------------------------|
+| `file` | Upload via `POST /v1/files`, pass the token | Buyer gets a signed CDN download link |
+| `url` | Pass a URL string | Buyer is redirected to the URL |
+| `text` | Pass a plain text string | Text shown inline in confirmation |
 
-See [Deliverables](/deliverables) for edge cases and the full detection logic.
+### Attach a file
+
+```bash
+# Upload the file first
+curl -X POST https://api.listbee.so/v1/files \
+  -H "Authorization: Bearer lb_..." \
+  -F "file=@python-async-patterns.pdf"
+# → { "object": "file", "id": "file_...", "filename": "python-async-patterns.pdf" }
+
+# Attach it to the listing
+curl -X PUT https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "file", "token": "file_..."}'
+# → listing with fulfillment: "managed", has_deliverable: true
+```
+
+### Attach a URL or text
+
+```bash
+# URL deliverable
+curl -X PUT https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "url", "value": "https://your-bucket.s3.amazonaws.com/python-async.pdf"}'
+
+# Text deliverable (license key, code, etc.)
+curl -X PUT https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"type": "text", "value": "LICENSE-KEY-ABCD-1234-EFGH-5678"}'
+```
+
+### Remove a deliverable
+
+```bash
+curl -X DELETE https://api.listbee.so/v1/listings/lst_.../deliverable \
+  -H "Authorization: Bearer lb_..."
+# → listing reverts to external fulfillment
+```
+
+Deliverables are mutable — call `PUT` again to replace. Draft only — returns 409 if the listing is published.
+
+---
+
+## Publish
+
+`POST /v1/listings/{id}/publish` validates the listing and transitions it to published. The listing must have a name, price, and Stripe connected on the account.
+
+```bash
+curl -X POST https://api.listbee.so/v1/listings/lst_.../publish \
+  -H "Authorization: Bearer lb_..."
+# → listing with status: "published", readiness.sellable: true
+```
+
+If requirements are not met, returns 409 with readiness actions explaining what's missing.
+
+See [Listing lifecycle](/listing-lifecycle) for all state transitions (pause, resume, unpublish).
+
+---
+
+## Get a listing
+
+`GET /v1/listings/{listing_id}` returns a single listing by ID.
+
+```bash
+curl https://api.listbee.so/v1/listings/lst_... \
+  -H "Authorization: Bearer lb_..."
+```
+
+---
+
+## List listings
+
+`GET /v1/listings` returns all listings for the authenticated account. Supports `status` filter and cursor pagination.
+
+```bash
+curl "https://api.listbee.so/v1/listings?status=published&limit=20" \
+  -H "Authorization: Bearer lb_..."
+```
 
 ---
 
 ## Update a listing
 
-`PUT /v1/listings/{slug}` accepts any subset of fields. Only the fields you send are changed.
+`PUT /v1/listings/{listing_id}` accepts any subset of fields. Only the fields you send are changed. Draft listings are fully editable. Published listings must be paused first.
 
-The deliverable is immutable after creation — to change what buyers receive, delete the listing and create a new one. Fulfillment mode and checkout schema can be updated.
-
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.put(
-    "https://api.listbee.so/v1/listings/r7kq2xy9",
-    headers={"Authorization": "Bearer lb_..."},
-    json={
-        "price": 2500,   # raise price to $25.00
-        "tagline": "Production-ready async patterns for Python 3.10+",
-    },
-)
-listing = resp.json()
-print(listing["price"])    # 2500
+```bash
+curl -X PUT https://api.listbee.so/v1/listings/lst_... \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "price": 2500,
+    "tagline": "Production-ready async patterns for Python 3.10+"
+  }'
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-const listing = await client.listings.update("r7kq2xy9", {
-  price: 2500,   // raise price to $25.00
-  tagline: "Production-ready async patterns for Python 3.10+",
-});
-console.log(listing.price);    // 2500
-```
-
-</CodeGroup>
 
 ---
 
 ## Delete a listing
 
-`DELETE /v1/listings/{slug}` removes the listing and its product page. If the deliverable type was `FILE`, the file is also removed from the CDN.
+`DELETE /v1/listings/{listing_id}` removes the listing, its product page, and any stored deliverable files.
 
-<CodeGroup>
-
-```python title="Python"
-import httpx
-
-resp = httpx.delete(
-    "https://api.listbee.so/v1/listings/r7kq2xy9",
-    headers={"Authorization": "Bearer lb_..."},
-)
-# 204 No Content on success
+```bash
+curl -X DELETE https://api.listbee.so/v1/listings/lst_... \
+  -H "Authorization: Bearer lb_..."
+# → 204 No Content
 ```
-
-```typescript title="TypeScript"
-import { ListBee } from "listbee";
-
-const client = new ListBee({ apiKey: "lb_..." });
-
-await client.listings.delete("r7kq2xy9");
-// Returns void on success
-```
-
-</CodeGroup>
 
 ---
 
@@ -200,76 +173,62 @@ await client.listings.delete("r7kq2xy9");
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `id` | string | Listing ID (`lst_` prefix). Used for all management operations. |
+| `slug` | string | URL-safe identifier derived from name. Used in product page URLs. |
 | `name` | string | Listing title shown on the product page. |
-| `price` | integer | Price in smallest currency unit (cents for USD). |
-| `fulfillment` | string | `"managed"` or `"external"`. |
-| `deliverable_type` | string \| null | `"file"`, `"url"`, `"text"`, or `null`. |
+| `price` | integer | Price in minor currency units (cents for USD). |
+| `status` | string | `"draft"`, `"published"`, or `"paused"`. |
+| `fulfillment` | string | `"managed"` or `"external"`. Computed from deliverable presence. |
+| `has_deliverable` | boolean | Whether the listing has digital content attached. |
 | `checkout_schema` | array \| null | Custom fields collected at checkout. Max 10. |
 | `description` | string | Full description. Markdown supported. |
 | `tagline` | string | Short one-line pitch shown under the title. |
 | `highlights` | string[] | Bullet points displayed prominently on the page. |
 | `cta` | string | Buy button label. Defaults to `"Buy now"`. |
-| `cover_url` | string | URL of the cover image shown on the product page. |
 | `metadata` | object | Key-value store for your own data. Up to 50 keys. |
-| `badges` | string[] | Small labels displayed on the listing (e.g. `"New"`, `"Bestseller"`). |
-| `rating` | number | Display rating (0-5). Does not affect functionality. |
-| `reviews` | integer | Display review count. Does not affect functionality. |
-| `faqs` | object[] | FAQ items with `question` and `answer` fields. |
-
----
-
-## Slug-based lookup
-
-Listings are fetched by slug, not ID. The slug is derived from the listing name at creation time and cannot be changed.
-
-```
-GET  /v1/listings/{slug}
-PUT  /v1/listings/{slug}
-DELETE /v1/listings/{slug}
-```
 
 ---
 
 ## Next steps
 
+- [Listing lifecycle](/listing-lifecycle) — draft, published, paused states and transitions.
 - [Fulfillment modes](/fulfillment-modes) — managed vs external, when to use each.
-- [Orders & Delivery](/orders) — what happens after a buyer pays.
-- [Deliverables](/deliverables) — how auto-detection works and edge cases.
+- [Orders & delivery](/orders) — what happens after a buyer pays.
+- [Deliverables](/deliverables) — file, URL, and text content types.
 - [Checkout schema](/checkout-schema) — collect custom data from buyers.
 
 ---
 
 ## Copy for AI assistants
 
-<CodeBlock title="Cursor / Claude Code">
-```python
+```bash
 # ListBee — listings API
 #
 # A listing = priced product + hosted product page.
-# All prices in cents. Currency set at account level.
-# Listings looked up by slug, not ID.
+# All prices in minor units (cents for USD).
+# Management by ID, public lookup by slug.
+# Status: draft → published → paused
 #
-# Create (managed — digital content):
-#   POST /v1/listings  { name, price, deliverable: "https://..." }
-#   → fulfillment: "managed", deliverable_type: "file"|"url"|"text"
+# Create draft:
+#   POST /v1/listings  { name, price }
 #
-# Create (external — your app delivers):
-#   POST /v1/listings  { name, price, fulfillment: "external", checkout_schema?: [...] }
-#   → fulfillment: "external", deliverable_type: null
+# Set deliverable (managed fulfillment):
+#   POST /v1/files (upload) → token
+#   PUT /v1/listings/{id}/deliverable  { type: "file", token: "file_..." }
+#   PUT /v1/listings/{id}/deliverable  { type: "url", value: "https://..." }
+#   PUT /v1/listings/{id}/deliverable  { type: "text", value: "..." }
+#   DELETE /v1/listings/{id}/deliverable  → revert to external
 #
-# Checkout schema fields: { key, type: "text"|"select"|"date"|"address", label, required, options? }
-#   Max 10 fields. Address stored in order.shipping_address, others in checkout_data.
+# Publish:   POST /v1/listings/{id}/publish   → published
+# Pause:     POST /v1/listings/{id}/pause     → paused
+# Resume:    POST /v1/listings/{id}/resume    → published
+# Unpublish: POST /v1/listings/{id}/unpublish → draft (0 orders only)
 #
-# Update (partial, deliverable immutable):
-#   PUT /v1/listings/{slug}  { any subset of fields }
-#
-# Delete:
-#   DELETE /v1/listings/{slug}  → 204
-#
-# Get:     GET /v1/listings/{slug}
-# List:    GET /v1/listings?limit=20&cursor=...
+# Update:  PUT /v1/listings/{id}  { any subset of fields }
+# Delete:  DELETE /v1/listings/{id}  → 204
+# Get:     GET /v1/listings/{id}
+# List:    GET /v1/listings?status=published&limit=20&cursor=...
 #
 # Auth: Authorization: Bearer lb_...
 # Errors: RFC 9457 { type, title, status, detail, code, param }
 ```
-</CodeBlock>

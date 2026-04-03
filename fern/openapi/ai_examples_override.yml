@@ -70,3 +70,137 @@ paths:
               object: stripe_connect_session
               url: https://connect.stripe.com/setup/s/acct_1Gqj58Lz0qyl6XeW
               expires_at: '2024-07-01T12:00:00Z'
+  /v1/orders/order_id:
+    get:
+      x-fern-examples:
+        - path-parameters:
+            order_id: order_id
+          response:
+            body:
+              object: order
+              id: ord_9xM4kP7nR2qT5wY1
+              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+              buyer_email: jane.doe@example.com
+              amount: 2900
+              currency: USD
+              status: paid
+              checkout_data: {}
+              shipping_address:
+                name: Jane Doe
+                line1: 123 Maple Street
+                line2: Apt 4B
+                city: Springfield
+                state: IL
+                postal_code: '62704'
+                country: US
+                phone: '+12175551234'
+              fulfillment_status: fulfilled
+              carrier: USPS
+              tracking_code: '9400111899223456789012'
+              seller_note: Thank you for your purchase! Your digital content is attached.
+              stripe_payment_intent_id: pi_3abc123def456
+              paid_at: '2024-01-15T09:30:00Z'
+              fulfilled_at: '2024-01-15T10:00:00Z'
+              created_at: '2024-01-15T09:00:00Z'
+  /v1/orders/order_id/fulfill:
+    post:
+      x-fern-examples:
+        - path-parameters:
+            order_id: order_id
+          response:
+            body:
+              object: order
+              id: ord_9xM4kP7nR2qT5wY1
+              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+              buyer_email: jane.doe@example.com
+              amount: 2900
+              currency: USD
+              status: paid
+              checkout_data: {}
+              shipping_address:
+                name: Jane Doe
+                line1: 123 Maple Street
+                line2: Apt 4B
+                city: Springfield
+                state: IL
+                postal_code: '62704'
+                country: US
+                phone: '+12175551234'
+              fulfillment_status: fulfilled
+              carrier: USPS
+              tracking_code: '9400111899223456789012'
+              seller_note: Thank you for your purchase! Your order has been shipped.
+              stripe_payment_intent_id: pi_3abc123def456
+              paid_at: '2024-01-15T09:30:00Z'
+              fulfilled_at: '2024-01-16T14:45:00Z'
+              created_at: '2024-01-14T08:00:00Z'
+  /v1/orders/order_id/ship:
+    post:
+      x-fern-examples:
+        - path-parameters:
+            order_id: order_id
+          request:
+            carrier: FedEx
+            tracking_code: '123456789012'
+          response:
+            body:
+              object: order
+              id: ord_9xM4kP7nR2qT5wY1
+              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+              buyer_email: jane.doe@example.com
+              amount: 2900
+              currency: USD
+              status: paid
+              checkout_data: {}
+              shipping_address:
+                name: Jane Doe
+                line1: 123 Maple Street
+                line2: Apt 4B
+                city: Springfield
+                state: IL
+                postal_code: '62704'
+                country: US
+                phone: '+12175551234'
+              fulfillment_status: fulfilled
+              carrier: FedEx
+              tracking_code: '123456789012'
+              seller_note: Package shipped via FedEx Ground, expected delivery in 3-5 business days.
+              stripe_payment_intent_id: pi_3abc123def456
+              paid_at: '2024-01-15T09:30:00Z'
+              fulfilled_at: '2024-01-16T14:45:00Z'
+              created_at: '2024-01-14T08:00:00Z'
+  /v1/orders:
+    get:
+      x-fern-examples:
+        - response:
+            body:
+              object: list
+              data:
+                - object: order
+                  id: ord_9xM4kP7nR2qT5wY1
+                  listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+                  buyer_email: jane.doe@example.com
+                  amount: 2900
+                  currency: USD
+                  status: paid
+                  checkout_data: {}
+                  shipping_address:
+                    name: Jane Doe
+                    line1: 123 Maple Street
+                    line2: Apt 4B
+                    city: Springfield
+                    state: IL
+                    postal_code: '62704'
+                    country: US
+                    phone: '+12175551234'
+                  fulfillment_status: fulfilled
+                  carrier: USPS
+                  tracking_code: '9400111899223456789012'
+                  seller_note: Thank you for your purchase! Please contact us if you have any questions.
+                  stripe_payment_intent_id: pi_3abc123def456
+                  paid_at: '2024-01-15T09:30:00Z'
+                  fulfilled_at: '2024-01-16T14:45:00Z'
+                  created_at: '2024-01-15T08:55:00Z'
+              total_count: 47
+              cursor: eyJvcmRlcl9pZCI6Im9yZF85eE00a1A3blIyZVQ1d1kxIn0=
+              has_more: false

@@ -1,0 +1,83 @@
+---
+tags: ["api", "breaking-change", "new-feature"]
+---
+
+# Content types, customers, refunds, and more
+
+ListBee now supports three distinct content types for listings — giving agents and sellers full control over how orders are fulfilled after payment.
+
+## What changed
+
+- **Breaking:** Listings now require a `content_type` field at creation: `static` (ListBee delivers pre-attached content), `generated` (agent creates content post-payment, pushes via `POST /fulfill`), or `webhook` (seller's system handles delivery externally).
+- **Breaking:** Auth endpoints removed (`POST /v1/auth/otp`, `POST /v1/auth/otp/verify`). All authentication now goes through the [developer console](https://console.listbee.so). API keys (`lb_` prefix) are the only token type.
+- **Breaking:** `pause`/`resume` endpoints removed. Use `stock` field instead — set `stock: 0` to stop sales, `stock: null` for unlimited.
+- **Breaking:** `deliver` and `ship` endpoints replaced by `POST /v1/orders/{id}/fulfill` — unified fulfillment for generated content.
+- **Breaking:** Single deliverable endpoint replaced by multi-deliverable CRUD. Listings support up to 3 deliverables with individual add/remove.
+- **New:** `POST /v1/orders/{id}/refund` — issue full refunds through Stripe. Idempotent.
+- **New:** Customers API — `GET /v1/customers` and `GET /v1/customers/{id}`. Auto-created from order data, tracks purchase history and lifetime value.
+- **New:** `GET /v1/plans` — public endpoint listing all plan tiers with pricing. Cacheable.
+- **New:** Order snapshots — `listing_snapshot` and `seller_snapshot` fields capture listing and seller state at payment time.
+- **New:** `payment_status` field on orders — independent of fulfillment status (unpaid, paid, refunded).
+- **New:** Dispute tracking — `dispute_status`, `dispute_reason`, `dispute_amount`, `disputed_at` fields on orders.
+- **New:** Individual deliverable management — `POST /v1/listings/{id}/deliverables` to add, `DELETE /v1/listings/{id}/deliverables/{del_id}` to remove one.
+- **Improved:** Product pages rebuilt with Petite Vue + Vite for faster load times and better interactivity.
+- **Improved:** Developer console extracted to standalone React SPA at [console.listbee.so](https://console.listbee.so).
+- **Improved:** OpenAPI spec cleaned up — console-internal routes no longer appear in the public API reference.
+
+## Migration
+
+### Content type (required on create)
+
+Before:
+```bash
+POST /v1/listings  { "name": "Guide", "price": 2900 }
+PUT /v1/listings/{id}/deliverable  { "type": "file", "token": "..." }
+```
+
+After:
+```bash
+POST /v1/listings  { "name": "Guide", "price": 2900, "content_type": "static" }
+POST /v1/listings/{id}/deliverables  { "type": "file", "token": "..." }
+```
+
+### Authentication
+
+Before:
+```bash
+POST /v1/auth/otp         { "email": "you@example.com" }
+POST /v1/auth/otp/verify  { "code": "123456" }
+# → access token (at_...)
+POST /v1/api-keys          Authorization: Bearer at_...
+```
+
+After:
+1. Sign up at [console.listbee.so](https://console.listbee.so)
+2. Create an API key in Settings
+3. Use `Authorization: Bearer lb_...` for all API calls
+
+### Stock replaces pause/resume
+
+Before:
+```bash
+POST /v1/listings/{id}/pause
+POST /v1/listings/{id}/resume
+```
+
+After:
+```bash
+PUT /v1/listings/{id}  { "stock": 0 }     # stop sales
+PUT /v1/listings/{id}  { "stock": null }   # unlimited
+PUT /v1/listings/{id}  { "stock": 50 }     # sell exactly 50
+```
+
+### Fulfillment
+
+Before:
+```bash
+POST /v1/orders/{id}/deliver  { "type": "url", "value": "..." }
+```
+
+After:
+```bash
+POST /v1/orders/{id}/fulfill  { "deliverables": [{ "type": "url", "value": "..." }] }
+```

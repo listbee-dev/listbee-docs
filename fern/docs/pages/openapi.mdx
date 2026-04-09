@@ -1,7 +1,80 @@
 ---
 title: OpenAPI spec
-subtitle: Coming soon
+subtitle: Machine-readable API description for use with Postman, SDK generators, and AI tools.
 covers_endpoints: []
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+ListBee publishes an OpenAPI 3.1 spec that describes every endpoint, request schema, and response model. Use it to import the API into Postman, generate a client in any language, or power AI tool descriptions.
+
+## Spec URLs
+
+| URL | Description |
+|-----|-------------|
+| `https://api.listbee.so/openapi.json` | Live spec served directly by the API (always current) |
+| `https://listbee.so/openapi.json` | Alias — same content |
+
+The spec is regenerated automatically on every API deploy. There is no versioned spec archive — pin to a commit in the API repo if you need a snapshot.
+
+Fetch the spec:
+
+```bash
+curl https://api.listbee.so/openapi.json
+```
+
+## Use with Postman
+
+1. Open Postman and click **Import**.
+2. Paste `https://api.listbee.so/openapi.json` as the URL.
+3. Postman generates a collection with all endpoints pre-populated.
+4. Set a collection variable `baseUrl = https://api.listbee.so` and `apiKey = lb_...`.
+5. Add `Authorization: Bearer {{apiKey}}` as a collection-level header.
+
+## Use with OpenAPI Generator
+
+Generate a typed client in Python, Go, Ruby, or any supported language:
+
+```bash
+# Install the CLI
+npm install -g @openapitools/openapi-generator-cli
+
+# Generate a Python client
+openapi-generator-cli generate \
+  -i https://api.listbee.so/openapi.json \
+  -g python \
+  -o ./listbee-client-generated \
+  --additional-properties=packageName=listbee_client
+```
+
+Note: the official [Python SDK](/sdks) and [TypeScript SDK](/sdks) are hand-crafted and preferred over generated clients. Generated clients are useful for languages without an official SDK.
+
+## Use with AI tools
+
+The spec is used internally by:
+
+- **ListBee MCP server** — the spec feeds tool schemas so agents know exactly what parameters each tool accepts
+- **n8n community node** — field definitions are derived from the spec via `lb-sync`
+- **Make / Zapier** — import the OpenAPI spec URL to create a custom app
+
+The `operationId` on each endpoint is stable across API versions and used as a tool name in MCP and as an action identifier in docs.
+
+## Interactive reference
+
+A hosted interactive API reference (powered by Scalar) is available at:
+
+```
+https://api.listbee.so/docs
+```
+
+It renders the live spec with request/response examples and a built-in HTTP client.
+
+## Spec quality
+
+Field descriptions in the spec are written for LLM consumption — precise, unambiguous, with no filler. Every field has a `description` and at least one example value. Route descriptions explain agent-relevant behavior, including when and how to read the `readiness` object.
+
+If you find a description that's missing or unclear, open an issue at [github.com/listbee-dev/listbee](https://github.com/listbee-dev/listbee).
+
+## Related
+
+- [SDKs](/sdks)
+- [MCP server](/mcp)
+- [API reference](/api-reference)

@@ -1,7 +1,135 @@
 ---
 title: Errors
-subtitle: Coming soon
+subtitle: How the ListBee API communicates failures
 covers_endpoints: []
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+All error responses use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) with `Content-Type: application/problem+json`.
+
+## Error structure
+
+```json
+{
+  "type": "https://docs.listbee.so/errors/invalid-request",
+  "title": "Invalid Request",
+  "status": 422,
+  "detail": "Price must be greater than 0",
+  "code": "invalid_price",
+  "param": "price"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | URI identifying the error type. Links to documentation. |
+| `title` | string | Stable, human-readable category label. |
+| `status` | integer | HTTP status code, echoed in the body. |
+| `detail` | string | Specific explanation of what went wrong. |
+| `code` | string | Machine-readable code for programmatic handling. |
+| `param` | string \| null | The request field that caused the error, if applicable. |
+
+Use `code` for programmatic branching — `title` and `detail` may change, `code` does not.
+
+## HTTP status codes
+
+| Status | When |
+|--------|------|
+| `400` | Malformed request (bad JSON, missing required fields). |
+| `401` | Missing or invalid API key. |
+| `403` | Valid API key but insufficient permissions. |
+| `404` | Resource not found. |
+| `409` | Conflict — resource already exists, or idempotency key in progress. |
+| `422` | Valid request format but failed business validation (e.g. invalid price, key reuse). |
+| `429` | Rate limit exceeded. See [Rate limits](/rate-limits). |
+| `500` | Internal server error. Contact support with `x-correlation-id` header value. |
+
+## Common error codes
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `authentication_error` | 401 | API key missing, expired, or revoked. |
+| `not_found` | 404 | Resource with this ID does not exist or belongs to another account. |
+| `invalid_price` | 422 | Price must be a positive integer (in cents). |
+| `listing_not_published` | 422 | Operation requires the listing to be published. |
+| `rate_limited` | 429 | Too many requests. Check `Retry-After` header. |
+| `idempotency_key_reuse` | 422 | Same idempotency key sent with a different request body. |
+| `idempotency_request_in_progress` | 409 | Concurrent request with this key is still in flight. |
+
+## Handling errors in Python
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+from listbee import ListBee
+from listbee.exceptions import (
+    ListBeeError,
+    AuthenticationError,
+    NotFoundError,
+    ValidationError,
+    RateLimitError,
+)
+
+client = ListBee(api_key="lb_...")
+
+try:
+    listing = client.listings.get("lst_abc123")
+except AuthenticationError:
+    # API key is invalid — re-authenticate
+    print("Invalid API key")
+except NotFoundError as e:
+    # 404 — resource does not exist
+    print(f"Not found: {e.detail}")
+except ValidationError as e:
+    # 422 — check e.code and e.param for the specific field
+    print(f"Validation error on '{e.param}': {e.detail}")
+except RateLimitError as e:
+    # 429 — back off and retry
+    import time
+    time.sleep(e.retry_after or 10)
+except ListBeeError as e:
+    # Catch-all for any other API error
+    print(f"API error {e.status_code}: {e.code} — {e.detail}")
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+# A 404 response:
+curl https://api.listbee.so/v1/listings/lst_doesnotexist \
+  -H "Authorization: Bearer lb_..."
+
+# HTTP/1.1 404 Not Found
+# Content-Type: application/problem+json
+#
+# {
+#   "type": "https://docs.listbee.so/errors/not-found",
+#   "title": "Not Found",
+#   "status": 404,
+#   "detail": "Listing lst_doesnotexist not found",
+#   "code": "not_found",
+#   "param": null
+# }
+```
+</CodeBlock>
+</CodeBlocks>
+
+## Correlation IDs
+
+Every response includes an `x-correlation-id` header. Include it when contacting support — it ties your request to the server-side logs.
+
+```python
+import httpx
+
+response = httpx.get(
+    "https://api.listbee.so/v1/listings/lst_abc123",
+    headers={"Authorization": "Bearer lb_..."},
+)
+
+if response.status_code >= 400:
+    correlation_id = response.headers.get("x-correlation-id")
+    print(f"Request failed. Correlation ID: {correlation_id}")
+```
+
+## Related
+
+- [Rate limits](/rate-limits) — handling 429 responses
+- [Idempotency](/idempotency) — safe retries for POST requests

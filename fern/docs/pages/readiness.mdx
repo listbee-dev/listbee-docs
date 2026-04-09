@@ -1,7 +1,165 @@
 ---
 title: Readiness
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Actionable setup state on accounts and listings
+covers_endpoints: [get_account, get_listing]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+The `readiness` object appears on both account and listing responses. It tells you whether the resource is operational and, if not, exactly what to do next. Agents can consume readiness programmatically to drive setup workflows without hardcoding business rules.
+
+## How it works
+
+Every `GET /v1/account` and `GET /v1/listings/{id}` response includes a `readiness` object. It has three fields:
+
+- **`operational`** (account) or **`sellable`** (listing) — `true` when the resource is ready to use.
+- **`actions`** — array of steps to take, each with a code, kind, message, and resolve instructions.
+- **`next`** — the code of the highest-priority action. `null` when ready. API-kind actions take priority over human-kind.
+
+When `actions` is empty, the resource is ready. When `actions` is non-empty, work through them in order — each resolved action may unlock the next.
+
+## Action shape
+
+```json
+{
+  "code": "connect_stripe",
+  "kind": "api",
+  "message": "Connect Stripe account to accept payments.",
+  "resolve": {
+    "method": "POST",
+    "endpoint": "/v1/account/stripe/connect",
+    "url": null,
+    "params": null
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | Machine-readable identifier for branching logic |
+| `kind` | string | `api` — agent can call the endpoint directly; `human` — requires browser redirect |
+| `message` | string | Human-readable explanation; safe to relay to users |
+| `resolve.method` | string | HTTP method, or `redirect` for human actions |
+| `resolve.endpoint` | string | API path for `kind: api` actions |
+| `resolve.url` | string | Full URL for `kind: human` actions |
+| `resolve.params` | object | Example request body for API actions |
+
+## Account readiness
+
+`GET /v1/account` returns `readiness.operational`. An account is operational when Stripe is connected, charges are enabled, and billing is current.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+account = client.account.get()
+
+if not account.readiness.operational:
+    next_action = account.readiness.next
+    actions = {a.code: a for a in account.readiness.actions}
+
+    action = actions[next_action]
+    print(f"Next step: {action.message}")
+    # next_action == "connect_stripe" → call POST /v1/account/stripe/connect
+    # next_action == "enable_charges" → redirect human to Stripe onboarding
+    # next_action == "update_billing" → redirect human to billing page
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl https://api.listbee.so/v1/account \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+Account readiness response (not yet operational):
+
+```json
+{
+  "object": "account",
+  "id": "acc_7kQ2xY9mN3pR5tW1",
+  "readiness": {
+    "operational": false,
+    "actions": [
+      {
+        "code": "connect_stripe",
+        "kind": "api",
+        "message": "Connect Stripe account to accept payments.",
+        "resolve": {
+          "method": "POST",
+          "endpoint": "/v1/account/stripe/connect",
+          "url": null,
+          "params": null
+        }
+      }
+    ],
+    "next": "connect_stripe"
+  }
+}
+```
+
+## Listing readiness
+
+`GET /v1/listings/{id}` returns `readiness.sellable`. A listing is sellable when the account is operational and all listing-specific requirements are met.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+listing = client.listings.get(listing_id="lst_7kQ2xY9mN3pR5tW1vB8a")
+
+if not listing.readiness.sellable:
+    for action in listing.readiness.actions:
+        print(f"{action.code} ({action.kind}): {action.message}")
+        if action.kind == "api":
+            print(f"  → {action.resolve.method} {action.resolve.endpoint}")
+        else:
+            print(f"  → redirect to {action.resolve.url}")
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+## Common action codes
+
+| Code | Kind | When it appears | Resolution |
+|------|------|----------------|------------|
+| `connect_stripe` | `api` | No Stripe account connected | `POST /v1/account/stripe/connect` — returns onboarding URL |
+| `enable_charges` | `human` | Stripe connected but onboarding incomplete | Redirect to Stripe onboarding via console |
+| `update_billing` | `human` | Billing past due or unpaid | Redirect to billing page in console |
+| `attach_deliverable` | `api` | `static` listing has no deliverables | `POST /v1/listings/{id}/deliverables` |
+| `configure_webhook` | `api` | `generated` or `webhook` listing has no active `order.paid` webhook | `POST /v1/webhooks` |
+| `publish_listing` | `api` | All other blockers cleared; listing still in draft | `POST /v1/listings/{id}/publish` |
+| `webhook_disabled` | `api` | Webhook was auto-disabled after consecutive failures | Re-enable or replace the webhook |
+
+## Walking an agent through setup
+
+Because `kind` tells you whether a step is automated or human-gated, agents can handle setup end-to-end up to the first human step:
+
+```python
+account = client.account.get()
+
+for action in account.readiness.actions:
+    if action.kind == "api":
+        # Agent executes directly
+        print(f"Calling {action.resolve.method} {action.resolve.endpoint}")
+    else:
+        # Hand off to human
+        print(f"Human action required: {action.message}")
+        print(f"URL: {action.resolve.url}")
+        break
+```
+
+`publish_listing` always appears last in the actions list, only when all other blockers are cleared. This pattern — resolve each action and re-fetch — converges to `sellable: true`.
+
+## Related
+
+- [Authentication](/docs/authentication) — getting an API key before setup begins
+- [Listings](/docs/listings) — listing state and the publish step
+- [Webhooks](/docs/webhooks) — configuring webhooks to clear `configure_webhook` actions

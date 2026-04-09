@@ -1,7 +1,61 @@
 ---
 title: Limitations
-subtitle: Coming soon
+subtitle: What ListBee does not do and the constraints to design around.
 covers_endpoints: []
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+## Scope
+
+**No marketplace.** ListBee is a single-seller API. Each account has one brand and one Stripe Connect connection. There is no multi-vendor marketplace, no seller discovery, and no cross-account order routing. Agents operating on behalf of multiple brands use multiple accounts.
+
+**No physical shipping.** ListBee does not calculate shipping rates, generate labels, or integrate with fulfillment providers. You can collect a shipping address at checkout using the `checkout_schema` field (add an `address` field), but ListBee passes that data to you via the `order.paid` webhook — your app handles fulfillment.
+
+**USD only.** All prices and charges are in US dollars. There is no multi-currency support. The `currency` field on an order will always be `usd`.
+
+**No subscriptions or recurring billing.** ListBee processes one-time payments only. There is no subscription plan creation, no metered billing, and no trial periods. For recurring revenue, use Stripe Billing directly.
+
+**No built-in analytics dashboard.** ListBee does not provide revenue charts, conversion funnels, or traffic reports. Order and listing data is accessible via the API — build your own reporting, or pipe events to a data warehouse via webhooks.
+
+## File limits
+
+| Limit | Value |
+|-------|-------|
+| Max file size per upload | 100 MB |
+| Max deliverables per listing | 3 |
+| Deliverable types | FILE, URL, TEXT |
+
+Files are stored on Bunny CDN. There is no storage quota per account, but individual file uploads are capped at 100 MB. If you need to deliver files larger than 100 MB, use a URL deliverable pointing to your own storage.
+
+## Access grant limits
+
+When a buyer pays for a `static` listing, ListBee creates an access grant with the following constraints:
+
+| Constraint | Value |
+|------------|-------|
+| Expiry | 48 hours after creation |
+| Max downloads | 10 |
+
+After the grant expires or the download limit is reached, the download link returns 410. There is no way to extend or reissue a grant via the API. If a buyer needs renewed access, issue a manual refund and ask them to re-purchase, or handle it out of band.
+
+## Rate limits
+
+API requests are rate-limited per API key. See [Rate limits](/rate-limits) for the per-endpoint limits and the headers ListBee returns when a limit is reached.
+
+## Webhooks
+
+Webhook payloads have a 30-second delivery timeout. If your endpoint does not respond with a 2xx within 30 seconds, ListBee marks the delivery as failed and retries with exponential backoff. Retries are attempted up to 5 times over approximately 24 hours.
+
+There is no ordering guarantee across multiple webhooks configured on the same account. If ordering matters, use a single webhook endpoint and sequence processing in your app.
+
+## Stripe requirements
+
+Sellers must complete Stripe Connect onboarding before a listing can receive orders. There is no way to publish a listing on a Stripe-disconnected account. The `readiness` object on the account and listing surfaces this as a `stripe_not_connected` action with a `human` kind — the account owner must complete onboarding via the Connect link.
+
+ListBee collects a platform fee on each sale via Stripe Connect. The fee rate is shown on the account object (`fee_rate`). There is no way to waive the platform fee.
+
+## Related
+
+- [Rate limits](/rate-limits)
+- [Fulfillment](/fulfillment)
+- [Checkout schema](/checkout-schema)
+- [Entity model](/entity-model)

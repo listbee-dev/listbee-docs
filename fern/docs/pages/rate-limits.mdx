@@ -1,7 +1,99 @@
 ---
 title: Rate limits
-subtitle: Coming soon
+subtitle: Understand per-endpoint limits and handle 429 responses
 covers_endpoints: []
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+Rate limits are enforced per API key (or IP address if unauthenticated). Limits reset on a rolling 1-minute window.
+
+## Limits by endpoint category
+
+| Category | Endpoints | Limit |
+|----------|-----------|-------|
+| Listings (read/write) | `GET`, `POST`, `PUT /v1/listings` and listing actions | 120 / minute |
+| Files | `POST /v1/files` | 60 / minute |
+| Webhooks | `GET /v1/webhooks`, `PUT /v1/webhooks/{id}`, `DELETE /v1/webhooks/{id}` | 20 / minute |
+| Webhook create/test/rotate | `POST /v1/webhooks`, `POST /v1/webhooks/{id}/test`, `POST /v1/webhooks/{id}/rotate-secret` | 5–10 / minute |
+| Account update | `PUT /v1/account` | 10 / minute |
+| API keys | `POST /v1/api-keys` | 10 / minute |
+| Stripe connect | `POST /v1/stripe` | 5 / minute |
+
+## 429 response
+
+When you exceed a limit, the API returns `429 Too Many Requests` with a `Retry-After` header indicating how many seconds to wait.
+
+```json
+{
+  "type": "https://docs.listbee.so/errors/rate-limited",
+  "title": "Rate Limited",
+  "status": 429,
+  "detail": "Rate limit exceeded. Try again in 12 seconds.",
+  "code": "rate_limited"
+}
+```
+
+The `Retry-After` header is set to the number of seconds remaining in the current window.
+
+## Handling 429s in Python
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+import time
+from listbee import ListBee
+from listbee.exceptions import RateLimitError
+
+client = ListBee(api_key="lb_...")
+
+
+def create_listing_with_backoff(title: str, price: int, max_retries: int = 4):
+    for attempt in range(max_retries):
+        try:
+            return client.listings.create(title=title, price=price)
+        except RateLimitError as e:
+            if attempt == max_retries - 1:
+                raise
+            wait = e.retry_after or (2 ** attempt)
+            time.sleep(wait)
+    raise RuntimeError("unreachable")
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+# Check the Retry-After header on a 429:
+curl -i -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"title": "My listing", "price": 1000}'
+
+# HTTP/1.1 429 Too Many Requests
+# Retry-After: 12
+```
+</CodeBlock>
+</CodeBlocks>
+
+## Bulk operations
+
+There are no batch endpoints. If you need to create many listings programmatically, throttle your requests to stay within the 120/minute limit — roughly 2 per second with headroom.
+
+```python
+import time
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+listings_data = [
+    {"title": "Course module 1", "price": 1900},
+    {"title": "Course module 2", "price": 1900},
+    # ...
+]
+
+for data in listings_data:
+    client.listings.create(**data)
+    time.sleep(0.6)  # ~100/minute, well within limits
+```
+
+## Next steps
+
+- [Idempotency](/idempotency) — retry failed requests safely
+- [Errors](/errors) — full error format reference

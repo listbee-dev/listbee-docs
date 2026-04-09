@@ -1,7 +1,122 @@
 ---
 title: Sell from Claude Code
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Create a listing, upload a file, attach it as a deliverable, and publish — all from a Python script.
+covers_endpoints: [create_listing, upload_file, add_deliverable, publish_listing]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+A user says "sell my ebook for $19." The agent needs to create a listing, upload the file, attach it as a deliverable, and publish — four API calls in sequence.
+
+## Full script
+
+```python
+import os
+from listbee import ListBee
+
+client = ListBee(api_key=os.environ["LISTBEE_API_KEY"])
+
+# 1. Create a draft listing
+listing = client.listings.create(
+    name="Python Automation Handbook",
+    price=1900,                # $19.00
+    content_type="static",     # ListBee delivers the file automatically after payment
+    description="A practical guide to automating repetitive tasks with Python.",
+)
+
+print(f"Listing created: {listing.id}")
+print(f"Status: {listing.status}")           # draft
+print(f"Sellable: {listing.readiness.sellable}")  # False — no deliverable yet
+
+# 2. Upload the file
+with open("handbook.pdf", "rb") as f:
+    file = client.files.upload(file=f, filename="handbook.pdf")
+
+print(f"File uploaded: {file.token}")
+
+# 3. Attach the file as a deliverable
+client.listings.add_deliverable(
+    listing_id=listing.id,
+    type="file",
+    token=file.token,
+)
+
+print("Deliverable attached")
+
+# 4. Publish the listing
+published = client.listings.publish(listing_id=listing.id)
+
+print(f"Status: {published.status}")         # published
+print(f"Product page: {published.url}")      # https://buy.listbee.so/python-automation-handbook
+print(f"Sellable: {published.readiness.sellable}")  # True
+```
+
+## What happens
+
+**Step 1 — Create listing.** `content_type="static"` tells ListBee to deliver the file automatically after payment. The listing is created in `draft` status. The `readiness` object in the response includes a `no_deliverable` action pointing to the next call.
+
+**Step 2 — Upload file.** `POST /v1/files` uploads the file to Bunny CDN and returns a `token`. The token is a reference — it doesn't contain the file content.
+
+**Step 3 — Attach deliverable.** `POST /v1/listings/{id}/deliverables` links the uploaded file to the listing. Buyers receive a signed download link valid for 48 hours and up to 10 downloads after payment.
+
+**Step 4 — Publish.** `POST /v1/listings/{id}/publish` makes the listing live. The product page is immediately accessible. `readiness.sellable` becomes `true`.
+
+## Reading the readiness object
+
+After step 1, the response looks like:
+
+```json
+{
+  "object": "listing",
+  "id": "lst_abc123",
+  "status": "draft",
+  "readiness": {
+    "sellable": false,
+    "actions": [
+      {
+        "code": "no_deliverable",
+        "kind": "api",
+        "message": "Attach a deliverable so buyers receive content after payment.",
+        "resolve": {
+          "method": "POST",
+          "endpoint": "/v1/listings/lst_abc123/deliverables",
+          "params": null
+        }
+      }
+    ],
+    "next": "no_deliverable"
+  }
+}
+```
+
+`readiness.next` is the action code the agent should resolve first. After attaching a deliverable, `next` becomes `not_published`. After publishing, `next` becomes `null` and `sellable` becomes `true`.
+
+Agents can follow this chain without any hardcoded logic about what comes next.
+
+## Variations
+
+**URL deliverable instead of file upload** — skip steps 2 and 3, use `type="url"` with a `value`:
+
+```python
+client.listings.add_deliverable(
+    listing_id=listing.id,
+    type="url",
+    value="https://example.com/download/handbook",
+)
+```
+
+**Text deliverable** — deliver a license key, access code, or any short text:
+
+```python
+client.listings.add_deliverable(
+    listing_id=listing.id,
+    type="text",
+    value="Your license key: XXXX-XXXX-XXXX-XXXX",
+)
+```
+
+**AI-generated content** — use `content_type="generated"` instead of `static`. ListBee holds the order in `processing` status until the agent calls `fulfill_order` with the generated content. See [Fulfillment](/fulfillment) for details.
+
+## Related
+
+- [Quickstart](/quickstart)
+- [Fulfillment](/fulfillment)
+- [MCP server](/mcp)

@@ -1,7 +1,164 @@
 ---
 title: Orders
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Track and manage buyer transactions from checkout to delivery
+covers_endpoints: [list_orders, get_order, fulfill_order, refund_order]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+An order is created when a buyer starts a Stripe Checkout session. It captures the buyer's email, the listing being purchased, and the amount paid. Orders move through a status lifecycle that depends on the listing's `content_type`.
+
+## How it works
+
+An order begins as `pending` the moment a buyer submits the checkout form. It transitions to `paid` when Stripe confirms payment. From there, what happens depends on `content_type`:
+
+- **static** — ListBee auto-delivers pre-attached content and transitions the order to `fulfilled`.
+- **generated** — the order enters `processing`, waiting for your agent to call `POST /v1/orders/{id}/fulfill` with the generated content.
+- **webhook** — the order stays `paid` while ListBee fires `order.paid` to your endpoint; once your system confirms, the order transitions to `handed_off`.
+
+Orders have two independent status fields: `status` (fulfillment lifecycle) and `payment_status` (Stripe payment state). An order can be `fulfilled` with `payment_status: paid`, then later have `payment_status: refunded` if a refund is issued.
+
+Each order includes `listing_snapshot` and `seller_snapshot` — immutable copies of the listing and seller data captured at payment time. These are the authoritative record of what was purchased, regardless of later changes to the listing.
+
+## Fetching an order
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+order = client.orders.get(order_id="ord_9xM4kP7nR2qT5wY1")
+
+print(order.status)          # fulfilled
+print(order.payment_status)  # paid
+print(order.buyer_email)     # buyer@example.com
+print(order.amount)          # 1900 ($19.00)
+print(order.content_type)    # static
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1 \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+## Listing orders
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+result = client.orders.list()
+
+for order in result.data:
+    print(order.id, order.status, order.buyer_email)
+
+# Filter by status
+paid_orders = client.orders.list(status="paid")
+
+# Next page
+if result.has_more:
+    next_page = client.orders.list(cursor=result.cursor)
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl "https://api.listbee.so/v1/orders?status=paid" \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+## Fulfilling a generated order
+
+For `generated` content type listings, push the generated content after your agent has created it:
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+# After generating content in response to an order.paid webhook:
+client.orders.fulfill(
+    order_id="ord_9xM4kP7nR2qT5wY1",
+    deliverables=[
+        {"type": "text", "value": "Your personalized report: ..."},
+    ],
+)
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deliverables": [
+      {"type": "text", "value": "Your personalized report: ..."}
+    ]
+  }'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+ListBee creates an access grant, emails the buyer a download link, and transitions the order to `fulfilled`. Deliverable types are `file` (token from `POST /v1/files`), `url`, or `text`. Up to 3 per order.
+
+## Issuing a refund
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+order = client.orders.refund(order_id="ord_9xM4kP7nR2qT5wY1")
+
+print(order.payment_status)  # refunded
+print(order.refund_amount)   # 1900
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/refund \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+Only orders with `status: paid` or `status: fulfilled` can be refunded. Refunds are processed through Stripe on the seller's connected account. The platform fee is not returned to the seller.
+
+## Order status lifecycle
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Checkout started; buyer data captured; awaiting payment |
+| `paid` | Stripe confirmed payment; delivery in progress |
+| `processing` | Generated listing: agent is generating content |
+| `fulfilled` | Content delivered to buyer |
+| `handed_off` | Webhook listing: external system confirmed receipt |
+| `canceled` | Checkout abandoned or payment failed after 24h |
+| `failed` | System error during payment or delivery |
+
+## Key fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique order ID (`ord_` prefixed) |
+| `listing_id` | string | ID of the purchased listing |
+| `buyer_email` | string | Buyer's email address from Stripe Checkout |
+| `amount` | integer | Amount paid in cents |
+| `currency` | string | Three-letter ISO currency code, uppercase |
+| `status` | string | Fulfillment lifecycle status |
+| `payment_status` | string | Stripe payment state: `unpaid`, `paid`, or `refunded` |
+| `content_type` | string | Content type at time of purchase — use this to branch post-payment logic |
+| `checkout_data` | object | Custom field values submitted by the buyer |
+| `listing_snapshot` | object | Immutable copy of listing data at payment time |
+| `seller_snapshot` | object | Immutable copy of seller identity at payment time |
+| `deliverables` | array | Content attached to this order (auto for static, pushed for generated) |
+| `stripe_payment_intent_id` | string | Stripe PaymentIntent ID for cross-referencing |
+| `platform_fee` | integer | Platform fee deducted in cents |
+| `refund_amount` | integer | Amount refunded in cents; `0` if not refunded |
+| `paid_at` | string | When payment was confirmed |
+| `fulfilled_at` | string | When order was fulfilled |
+
+## Related
+
+- [Fulfillment](/docs/fulfillment) — how content type affects the order lifecycle
+- [Webhooks](/docs/webhooks) — receiving `order.paid` and `order.fulfilled` events
+- [Listings](/docs/listings) — how listings and their content type drive order behavior

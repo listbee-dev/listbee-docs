@@ -1,7 +1,122 @@
 ---
 title: Idempotency
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Make POST requests safe to retry
+covers_endpoints: [create_listing, create_webhook]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+All POST endpoints accept an `Idempotency-Key` header. Sending the same key within 24 hours returns the original cached response instead of executing the request again.
+
+## Prerequisites
+
+- A ListBee API key (`lb_...`)
+
+## Steps
+
+### 1. Generate a unique key
+
+The key can be any string up to 255 characters. UUIDs work well. Generate one per logical operation — not per retry.
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+import uuid
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+idempotency_key = str(uuid.uuid4())  # e.g. "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+listing = client.listings.create(
+    title="Advanced Python course",
+    price=9900,
+    headers={"Idempotency-Key": idempotency_key},
+)
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: f47ac10b-58cc-4372-a567-0e02b2c3d479" \
+  -d '{
+    "title": "Advanced Python course",
+    "price": 9900
+  }'
+```
+</CodeBlock>
+</CodeBlocks>
+
+### 2. Retry safely on failure
+
+If a network error occurs before you receive a response, retry with the same `Idempotency-Key`. If the first request succeeded, you'll get the cached response. If it failed, the request runs again.
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+import uuid
+import time
+from listbee import ListBee
+from listbee.exceptions import ListBeeError
+
+client = ListBee(api_key="lb_...")
+idempotency_key = str(uuid.uuid4())
+
+for attempt in range(3):
+    try:
+        listing = client.listings.create(
+            title="Advanced Python course",
+            price=9900,
+            headers={"Idempotency-Key": idempotency_key},
+        )
+        break
+    except ListBeeError as e:
+        if e.status_code == 409:
+            raise  # key conflict — do not retry
+        if attempt == 2:
+            raise
+        time.sleep(2 ** attempt)
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+# First attempt (times out or errors):
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: f47ac10b-58cc-4372-a567-0e02b2c3d479" \
+  -d '{"title": "Advanced Python course", "price": 9900}'
+
+# Retry with the same key — safe:
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: f47ac10b-58cc-4372-a567-0e02b2c3d479" \
+  -d '{"title": "Advanced Python course", "price": 9900}'
+```
+</CodeBlock>
+</CodeBlocks>
+
+## How it works
+
+- The cached response is stored for **24 hours** per API key.
+- Scoped per account — keys from different accounts do not collide.
+- The key is fingerprinted against the request body. Sending the same key with a different body returns a `422` error with code `idempotency_key_reuse`.
+- If two concurrent requests arrive with the same key, the second returns a `409` with code `idempotency_request_in_progress`. Retry after the first request completes.
+
+## Error cases
+
+| Status | Code | Cause |
+|--------|------|-------|
+| `422` | `idempotency_key_reuse` | Same key, different request body. Use a new key. |
+| `409` | `idempotency_request_in_progress` | Concurrent request in flight. Wait, then retry. |
+| `422` | `idempotency_key_invalid` | Key longer than 255 characters. |
+
+## Verify
+
+A cached response is identical to the original — same status code, same body. There is no `Idempotent-Replayed` header. You can confirm a key was used by attempting the same request again and observing that no duplicate resource was created.
+
+## Next steps
+
+- [Errors](/errors) — handle API errors and retries
+- [Rate limits](/rate-limits) — understand retry constraints

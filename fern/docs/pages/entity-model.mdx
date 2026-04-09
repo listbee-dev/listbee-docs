@@ -1,7 +1,113 @@
 ---
 title: Entity model
-subtitle: Coming soon
+subtitle: The objects ListBee manages and how they relate to each other.
 covers_endpoints: []
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+ListBee is organized around a small set of entities. Understanding their relationships makes API responses easier to navigate and agent workflows easier to design.
+
+## Hierarchy
+
+```
+Account
+├── Listings
+│   └── Deliverables (up to 3 per listing)
+├── Orders
+│   └── AccessGrants (one per fulfilled order)
+├── Webhooks
+│   └── WebhookEvents
+└── ApiKeys
+```
+
+An **Account** is the root entity. Everything belongs to an account. One account maps to one Stripe Connect onboarding, one billing subscription, and one brand (display name, bio, avatar).
+
+**Listings** are the sellable items an account creates. Each listing has a hosted product page at `buy.listbee.so/{slug}`. Listings belong to an account and can have up to three deliverables.
+
+**Orders** are created when a buyer submits a checkout form. They progress through a state machine from `pending` (form submitted, awaiting payment) to a terminal state (`fulfilled`, `handed_off`, `canceled`, or `failed`). Each order holds a snapshot of the listing and seller at time of purchase.
+
+**AccessGrants** are created automatically when a `static` order reaches `fulfilled`. They contain a signed download token valid for 48 hours and up to 10 downloads. Buyers access their content through this token — ListBee never emails download links directly.
+
+**Webhooks** are outbound HTTP endpoints you configure to receive events. Each webhook filters by event type and has a signing secret (`whsec_...`) for payload verification.
+
+**WebhookEvents** are individual delivery attempts. If delivery fails, ListBee retries with exponential backoff. You can inspect event history and retry manually via the API.
+
+**ApiKeys** are the machine credentials used to authenticate API requests. The `lb_` value is shown once at creation. The stored entity has prefix `ak_` and stores only a hashed form.
+
+## ID prefix table
+
+| Prefix | Entity | Example |
+|--------|--------|---------|
+| `acc_` | Account | `acc_7kQ2xY9mN3pR5tW1vB8a` |
+| `lst_` | Listing | `lst_7kQ2xY9mN3pR5tW1vB8a` |
+| `ord_` | Order | `ord_7kQ2xY9mN3pR5tW1vB8a` |
+| `ag_` | AccessGrant | `ag_7kQ2xY9mN3pR5tW1vB8a` |
+| `wh_` | Webhook | `wh_7kQ2xY9mN3pR5tW1vB8a` |
+| `evt_` | WebhookEvent | `evt_7kQ2xY9mN3pR5tW1vB8a` |
+| `ak_` | ApiKey (entity) | `ak_7kQ2xY9mN3pR5tW1vB8a` |
+| `lbk_` | ApiKey (entity, alternate) | `lbk_7kQ2xY9mN3pR5tW1vB8a` |
+| `lb_` | API key value (bearer token) | `lb_abcdefghijklmnopqrstuvwx` |
+
+IDs use base62 encoding over a UUID4 and are always 22 characters after the prefix.
+
+## Listing states
+
+| Status | Description |
+|--------|-------------|
+| `draft` | Created but not published. Not accessible to buyers. |
+| `published` | Live. Product page accepts orders. |
+| `archived` | Taken offline. Product page returns 404. |
+
+A listing can only be published once it has a deliverable (for `static` content type) and the account has completed Stripe Connect onboarding.
+
+## Order states
+
+| Status | Content type | Description |
+|--------|-------------|-------------|
+| `pending` | all | Buyer submitted form, awaiting payment |
+| `paid` | all | Stripe confirmed payment |
+| `processing` | generated | Waiting for agent to call `fulfill_order` |
+| `fulfilled` | static, generated | Buyer received content |
+| `handed_off` | webhook | External system confirmed delivery |
+| `canceled` | all | Abandoned or manually canceled (24h TTL on `pending`) |
+| `failed` | all | Payment failed |
+
+## Content types
+
+The `content_type` field on a listing controls who delivers the content and when:
+
+| Content type | Deliverable required? | Who fulfills | Order terminal state |
+|-------------|----------------------|-------------|---------------------|
+| `static` | Yes (FILE, URL, or TEXT) | ListBee (automatic) | `fulfilled` |
+| `generated` | No | Agent (calls `fulfill_order`) | `fulfilled` |
+| `webhook` | No | Seller/app | `handed_off` |
+
+Content type is set at creation, mutable while `draft`, and frozen on publish.
+
+## Deliverable types
+
+Each listing can have up to three deliverables in any combination:
+
+| Type | What it is | Delivered as |
+|------|-----------|-------------|
+| `FILE` | Uploaded file (PDF, ZIP, etc.) | Signed download URL (72h, 10 page views) |
+| `URL` | External link | Redirect on the download page |
+| `TEXT` | Raw text (license key, instructions, etc.) | Rendered on the download page |
+
+## Webhook events
+
+| Event | When |
+|-------|------|
+| `order.paid` | Buyer's payment succeeded |
+| `order.fulfilled` | Order delivery confirmed (all content types) |
+| `order.refunded` | Refund issued |
+| `order.canceled` | Order abandoned or canceled |
+| `listing.published` | Listing went live |
+
+Both `order.paid` and `order.fulfilled` fire for all content types. Agents relying on `order.fulfilled` as the delivery signal will work consistently regardless of content type.
+
+## Related
+
+- [Listings](/listings)
+- [Orders](/orders)
+- [Webhooks](/webhooks)
+- [Fulfillment](/fulfillment)

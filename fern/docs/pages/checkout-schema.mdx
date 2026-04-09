@@ -1,7 +1,257 @@
 ---
 title: Checkout schema
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Collect custom fields from buyers at checkout
+covers_endpoints: [create_listing, update_listing]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+This guide shows how to define custom fields that appear on a listing's checkout form.
+
+## Prerequisites
+
+- A ListBee API key (`lb_...`)
+- A listing to attach the schema to (or create one now)
+
+## Steps
+
+### 1. Understand the default
+
+Email is always collected from buyers. No other fields are collected unless you define a `checkout_schema`.
+
+A checkout schema is an ordered array of field objects. Each field has a `key` (used in the order data), a `label` (shown to the buyer), and a `type` (`text`, `select`, or `date`).
+
+### 2. Add a text field
+
+Use `type: text` to collect free-form input — a name, a message, a shipping address line.
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+listing = client.listings.create(
+    title="Custom embroidery patch",
+    price=2500,
+    checkout_schema=[
+        {
+            "key": "personalization",
+            "type": "text",
+            "label": "Text to embroider",
+            "required": True,
+            "sort_order": 0,
+        }
+    ],
+)
+
+print(listing.checkout_url)
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Custom embroidery patch",
+    "price": 2500,
+    "checkout_schema": [
+      {
+        "key": "personalization",
+        "type": "text",
+        "label": "Text to embroider",
+        "required": true,
+        "sort_order": 0
+      }
+    ]
+  }'
+```
+</CodeBlock>
+</CodeBlocks>
+
+### 3. Add a select field
+
+Use `type: select` when buyers must choose from a fixed set of options. Set `options` to an array of strings (max 50 options per field).
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+listing = client.listings.create(
+    title="Premium hoodie",
+    price=7500,
+    checkout_schema=[
+        {
+            "key": "size",
+            "type": "select",
+            "label": "Size",
+            "options": ["XS", "S", "M", "L", "XL", "XXL"],
+            "required": True,
+            "sort_order": 0,
+        },
+        {
+            "key": "color",
+            "type": "select",
+            "label": "Color",
+            "options": ["Black", "White", "Navy"],
+            "required": True,
+            "sort_order": 1,
+        },
+    ],
+)
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Premium hoodie",
+    "price": 7500,
+    "checkout_schema": [
+      {
+        "key": "size",
+        "type": "select",
+        "label": "Size",
+        "options": ["XS", "S", "M", "L", "XL", "XXL"],
+        "required": true,
+        "sort_order": 0
+      },
+      {
+        "key": "color",
+        "type": "select",
+        "label": "Color",
+        "options": ["Black", "White", "Navy"],
+        "required": true,
+        "sort_order": 1
+      }
+    ]
+  }'
+```
+</CodeBlock>
+</CodeBlocks>
+
+### 4. Add a date field
+
+Use `type: date` to collect a date — a delivery date, a session booking date, or a start date.
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+listing = client.listings.create(
+    title="1-hour coaching session",
+    price=15000,
+    checkout_schema=[
+        {
+            "key": "preferred_date",
+            "type": "date",
+            "label": "Preferred session date",
+            "required": True,
+            "sort_order": 0,
+        }
+    ],
+)
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "1-hour coaching session",
+    "price": 15000,
+    "checkout_schema": [
+      {
+        "key": "preferred_date",
+        "type": "date",
+        "label": "Preferred session date",
+        "required": true,
+        "sort_order": 0
+      }
+    ]
+  }'
+```
+</CodeBlock>
+</CodeBlocks>
+
+### 5. Update the schema on an existing listing
+
+Pass `checkout_schema` to `PUT /v1/listings/{listing_id}`. The schema is replaced in full — not merged.
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+listing = client.listings.update(
+    "lst_abc123",
+    checkout_schema=[
+        {
+            "key": "note",
+            "type": "text",
+            "label": "Note for seller",
+            "required": False,
+            "sort_order": 0,
+        }
+    ],
+)
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X PUT https://api.listbee.so/v1/listings/lst_abc123 \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "checkout_schema": [
+      {
+        "key": "note",
+        "type": "text",
+        "label": "Note for seller",
+        "required": false,
+        "sort_order": 0
+      }
+    ]
+  }'
+```
+</CodeBlock>
+</CodeBlocks>
+
+To remove all custom fields, pass `checkout_schema: null` (or `None` in Python).
+
+## Field reference
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `key` | Yes | Machine-readable identifier. Appears in order data. Max 50 chars. |
+| `type` | Yes | `text`, `select`, or `date`. |
+| `label` | Yes | Label shown to the buyer at checkout. Max 100 chars. |
+| `required` | No | Defaults to `true`. Set `false` to make the field optional. |
+| `options` | Conditional | Required for `select` type. Array of strings, max 50 items. |
+| `sort_order` | No | Display order. Lower values appear first. Defaults to `0`. |
+
+## Verify
+
+Retrieve the listing and inspect `checkout_schema`:
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+listing = client.listings.get("lst_abc123")
+for field in listing.checkout_schema or []:
+    print(field.key, field.type, field.label)
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl https://api.listbee.so/v1/listings/lst_abc123 \
+  -H "Authorization: Bearer lb_..."
+```
+</CodeBlock>
+</CodeBlocks>
+
+Buyer responses are stored on the order under the same `key` values and appear in `order.checkout_data`.
+
+## Next steps
+
+- [Orders](/orders) — read buyer-submitted field values from `order.checkout_data`
+- [Fulfillment](/fulfillment) — use checkout data to generate or route delivery

@@ -1,7 +1,114 @@
 ---
 title: MCP server
-subtitle: Coming soon
+subtitle: Connect AI agents to your ListBee account using the Model Context Protocol.
 covers_endpoints: []
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+ListBee ships an MCP server (`listbee-mcp`) that exposes your commerce API as tools any MCP-compatible agent can call. Agents can create listings, check orders, configure webhooks, and trigger fulfillment — without writing API integration code.
+
+## Install
+
+The server runs via `npx`. No global install required.
+
+```bash
+npx listbee-mcp
+```
+
+Requires Node.js 20 or later.
+
+## Configuration
+
+Set your API key as an environment variable before starting the server:
+
+```bash
+export LISTBEE_API_KEY=lb_...
+npx listbee-mcp
+```
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "listbee": {
+      "command": "npx",
+      "args": ["listbee-mcp"],
+      "env": {
+        "LISTBEE_API_KEY": "lb_..."
+      }
+    }
+  }
+}
+```
+
+### Cursor / Cline / other stdio clients
+
+Same pattern — pass the command `npx listbee-mcp` and set `LISTBEE_API_KEY` in the process environment.
+
+## Transports
+
+The package ships two transports from the same codebase:
+
+| Transport | How to use | Typical clients |
+|-----------|-----------|-----------------|
+| **stdio** | `npx listbee-mcp` | Claude Desktop, Cursor, Cline, Claude Code |
+| **HTTP** | `mcp.listbee.so` | ChatGPT Apps, Claude API Connector, remote agents |
+
+For the HTTP transport, point your client at `https://mcp.listbee.so`. Requests are authenticated with your `LISTBEE_API_KEY` in the `Authorization` header.
+
+MCP discovery is available at [listbee.so/.well-known/mcp.json](https://listbee.so/.well-known/mcp.json).
+
+## Available tools
+
+The server exposes 27 tools covering the full API surface. Tools are grouped by resource:
+
+**Listings**
+- `create_listing` — create a draft listing
+- `get_listing` — retrieve a listing by ID
+- `list_listings` — paginate your listings
+- `update_listing` — update name, price, description, checkout schema
+- `delete_listing` — delete a draft listing
+- `add_deliverable` — attach a deliverable (file, URL, or text)
+- `set_deliverables` — replace all deliverables at once
+- `remove_deliverable` — remove a single deliverable
+- `remove_deliverables` — remove all deliverables
+- `publish_listing` — make a listing live
+
+**Orders**
+- `list_orders` — paginate orders, filter by status or listing
+- `get_order` — retrieve an order and its buyer data
+- `fulfill_order` — push generated content to an order
+- `refund_order` — issue a full refund
+
+**Files**
+- `upload_file` — upload a file for use as a deliverable
+
+**Webhooks**
+- `create_webhook` — register a webhook endpoint
+- `list_webhooks` — list configured webhooks
+- `update_webhook` — change URL, secret, or event filters
+- `delete_webhook` — remove a webhook
+- `list_webhook_events` — inspect delivery history
+- `retry_webhook_event` — re-deliver a failed event
+- `test_webhook` — send a test payload
+
+**Account**
+- `get_account` — retrieve account details and readiness
+- `update_account` — update display name, bio, avatar
+- `start_stripe_connect` — begin Stripe Connect onboarding
+- `list_customers` — paginate buyers
+- `list_plans` — retrieve available billing plans
+
+## Readiness-aware responses
+
+Every listing and account response includes a `readiness` object with an `actions` array. Each action has a `code`, a `kind` (`api` or `human`), a human-readable `message`, and a `resolve` block with the exact method and endpoint to call next.
+
+Agents should read `readiness.next` to know what to do after each step — the API walks agents through the setup sequence automatically.
+
+## Related
+
+- [Quickstart](/quickstart)
+- [SDKs](/sdks)
+- [API reference](/api-reference)

@@ -1,7 +1,196 @@
 ---
 title: Listings
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Create and manage sellable items with hosted product pages
+covers_endpoints: [create_listing, get_listing, list_listings, update_listing, delete_listing, publish_listing, set_deliverables, remove_deliverables]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+A listing is a sellable item. It has a price, a content type, and a hosted product page buyers visit to pay. Creating a listing returns a URL you share with buyers. When a buyer pays, ListBee fires a webhook or delivers content automatically — depending on the content type.
+
+## How it works
+
+Listings start in `draft` status. In draft, all fields are editable and the listing is not yet visible to buyers. When you're ready, call `publish` — the listing goes live, the product page becomes accessible, and orders can be placed. After publishing, `content_type` and `slug` cannot be changed.
+
+The product page at `url` (e.g. `https://buy.listbee.so/seo-playbook`) shows the listing name, description, price, and cover image. Buyers click the buy button and pay via Stripe Checkout. What happens after payment depends on `content_type` — see [Fulfillment](/docs/fulfillment).
+
+Each listing must pass a readiness check before it can be published. `readiness.sellable` indicates whether a buyer can currently complete a purchase. If `false`, `readiness.actions` lists what's needed. See [Readiness](/docs/readiness).
+
+## Creating a listing
+
+The three required fields are `name`, `price` (in cents), and `content_type`.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+listing = client.listings.create(
+    name="SEO Playbook 2026",
+    price=1900,             # $19.00
+    content_type="static",
+    description="A comprehensive guide to modern SEO techniques.",
+    tagline="Updated for 2026 algorithm changes",
+)
+
+print(listing.id)      # lst_7kQ2xY9mN3pR5tW1vB8a
+print(listing.status)  # draft
+print(listing.url)     # https://buy.listbee.so/seo-playbook-2026
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "SEO Playbook 2026",
+    "price": 1900,
+    "content_type": "static",
+    "description": "A comprehensive guide to modern SEO techniques.",
+    "tagline": "Updated for 2026 algorithm changes"
+  }'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+## Attaching deliverables
+
+For `static` listings, attach the content buyers receive after paying. Use a file (uploaded via `POST /v1/files`), a URL redirect, or raw text. Up to 3 deliverables per listing; mixed types allowed.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+# Replace all deliverables
+client.listings.set_deliverables(
+    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
+    deliverables=[
+        {"type": "url", "value": "https://example.com/download/seo-playbook"},
+    ],
+)
+
+# Or add a single deliverable
+client.listings.add_deliverable(
+    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
+    type="text",
+    value="Your license key: ABC-123-XYZ",
+)
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deliverables": [
+      {"type": "url", "value": "https://example.com/download/seo-playbook"}
+    ]
+  }'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+## Publishing
+
+Once deliverables are attached (for `static` listings) and Stripe is connected, publish the listing:
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+published = client.listings.publish(listing_id="lst_7kQ2xY9mN3pR5tW1vB8a")
+
+print(published.status)                # published
+print(published.readiness.sellable)    # True
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/publish \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+Publishing fails with `409` if `readiness.sellable` is `false`. Check `readiness.actions` to see what's blocking.
+
+## Updating a listing
+
+Partial updates — only provided fields change. `content_type` and `slug` are locked after publishing.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+listing = client.listings.update(
+    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
+    price=2500,
+    tagline="Now with bonus templates",
+)
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"price": 2500, "tagline": "Now with bonus templates"}'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+## Listing all listings
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+result = client.listings.list()
+
+for listing in result.data:
+    print(listing.id, listing.name, listing.status)
+
+# Next page
+if result.has_more:
+    next_page = client.listings.list(cursor=result.cursor)
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl "https://api.listbee.so/v1/listings" \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+## Key fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique listing ID (`lst_` prefixed) |
+| `name` | string | Product name shown on the product page |
+| `slug` | string | URL-safe identifier; globally unique; auto-generated from name |
+| `price` | integer | Price in cents — `1900` = $19.00 |
+| `content_type` | string | `static`, `generated`, or `webhook` — determines delivery mode |
+| `status` | string | `draft` or `published` |
+| `url` | string | Product page URL — share this with buyers |
+| `embed_url` | string | Embeddable product page URL for iframes |
+| `deliverables` | array | Content attached for `static` listings; empty for `generated` and `webhook` |
+| `checkout_schema` | array | Custom fields collected from the buyer at checkout |
+| `stock` | integer | `null` = unlimited; `0` = out of stock; positive = remaining units |
+| `compare_at_price` | integer | Strikethrough price in cents |
+| `readiness` | object | Whether the listing is sellable and what actions are needed |
+| `readiness.sellable` | boolean | `true` when buyers can complete a purchase |
+
+## State transitions
+
+```
+draft → published   (via POST /v1/listings/{id}/publish)
+```
+
+Published listings cannot be unpublished. Delete and recreate if needed.
+
+## Related
+
+- [Fulfillment](/docs/fulfillment) — how content type determines delivery
+- [Readiness](/docs/readiness) — how to interpret and resolve readiness actions
+- [Orders](/docs/orders) — what happens after a buyer pays
+- [Checkout schema](/docs/checkout-schema) — custom buyer fields at checkout

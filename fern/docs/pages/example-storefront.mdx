@@ -1,7 +1,158 @@
 ---
 title: Build a storefront
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Bulk-create listings from a JSON file, then poll for orders.
+covers_endpoints: [create_listing, list_listings, list_orders]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+This example creates multiple listings from a JSON catalogue file, then polls for recent orders. It's useful for seeding an account from an existing product catalogue or syncing a batch of items.
+
+## Full script
+
+```python
+import json
+import os
+import time
+from listbee import ListBee
+
+client = ListBee(api_key=os.environ["LISTBEE_API_KEY"])
+
+# --- Load catalogue ---
+
+with open("catalogue.json") as f:
+    catalogue = json.load(f)
+
+# catalogue.json shape:
+# [
+#   {
+#     "name": "Python Automation Handbook",
+#     "price": 1900,
+#     "description": "Automate repetitive tasks with Python.",
+#     "url": "https://example.com/downloads/python-handbook"
+#   },
+#   ...
+# ]
+
+# --- Create listings ---
+
+created = []
+
+for item in catalogue:
+    listing = client.listings.create(
+        name=item["name"],
+        price=item["price"],           # cents
+        content_type="static",
+        description=item.get("description"),
+    )
+
+    # Attach a URL deliverable
+    client.listings.add_deliverable(
+        listing_id=listing.id,
+        type="url",
+        value=item["url"],
+    )
+
+    # Publish
+    published = client.listings.publish(listing_id=listing.id)
+
+    created.append(published)
+    print(f"Published: {published.name} — {published.url}")
+
+print(f"\n{len(created)} listings published.")
+
+# --- Poll for recent orders ---
+
+print("\nFetching recent orders...")
+
+orders_page = client.orders.list(limit=50)
+
+while True:
+    for order in orders_page.data:
+        print(
+            f"{order.id}  {order.status:<12}  "
+            f"{order.buyer_email}  "
+            f"${order.amount / 100:.2f}"
+        )
+
+    if not orders_page.has_more:
+        break
+
+    orders_page = client.orders.list(limit=50, cursor=orders_page.cursor)
+
+print(f"\nDone.")
+```
+
+## What happens
+
+**Bulk listing creation.** The script iterates the catalogue and calls `create_listing` for each item. Each listing starts as `draft`, gets a URL deliverable attached, then is published. After `publish_listing`, the product page is live.
+
+**Cursor pagination.** `list_orders` returns up to 50 orders per page. If `has_more` is `true`, the response includes a `cursor` value. Pass it as the `cursor` parameter on the next call to fetch the following page. The loop continues until `has_more` is `false`.
+
+## Sample catalogue file
+
+```json
+[
+  {
+    "name": "Python Automation Handbook",
+    "price": 1900,
+    "description": "Automate repetitive tasks with Python.",
+    "url": "https://example.com/downloads/python-handbook"
+  },
+  {
+    "name": "SQL Query Cookbook",
+    "price": 2900,
+    "description": "50 production-ready SQL patterns.",
+    "url": "https://example.com/downloads/sql-cookbook"
+  },
+  {
+    "name": "Git Survival Guide",
+    "price": 990,
+    "description": "The commands you actually need.",
+    "url": "https://example.com/downloads/git-guide"
+  }
+]
+```
+
+## Listing all existing listings
+
+To inspect what's already in the account before running a bulk import:
+
+```python
+page = client.listings.list(limit=100)
+
+while True:
+    for listing in page.data:
+        print(f"{listing.id}  {listing.status:<10}  {listing.name}")
+    if not page.has_more:
+        break
+    page = client.listings.list(limit=100, cursor=page.cursor)
+```
+
+## Filtering orders by listing
+
+To pull orders for a specific listing only, pass `listing_id`:
+
+```python
+orders = client.orders.list(listing_id="lst_abc123", limit=50)
+```
+
+Or with curl:
+
+```bash
+curl "https://api.listbee.so/v1/orders?listing_id=lst_abc123&limit=50" \
+  -H "Authorization: Bearer lb_..."
+```
+
+## Variations
+
+**Skip already-published listings** — check `list_listings` first and skip items whose `name` already exists in the account. ListBee slugs are globally unique, so a name collision will result in a modified slug; checking by name avoids duplicates.
+
+**File deliverables** — replace the URL deliverable with a file upload (`POST /v1/files`) and reference the returned `token` in `add_deliverable`. See [Sell from Claude Code](/example-claude-code) for the upload flow.
+
+**Idempotent runs** — pass an `Idempotency-Key` header on `create_listing` to make re-runs safe. Same key within 24 hours returns the cached response without creating a duplicate.
+
+## Related
+
+- [Quickstart](/quickstart)
+- [Listings](/listings)
+- [Orders](/orders)
+- [Idempotency](/idempotency)

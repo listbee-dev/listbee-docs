@@ -1,7 +1,141 @@
 ---
 title: Sell from n8n
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Create a listing, register a webhook, and notify Slack when an order arrives.
+covers_endpoints: [create_listing, create_webhook]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+This example builds an n8n workflow that creates a listing, registers a webhook, and sends a Slack message each time an order is paid. It covers the two most common ListBee actions in n8n: creating content to sell and reacting to payments.
+
+## Prerequisites
+
+- n8n instance with `n8n-nodes-listbee` installed (see [n8n setup](/n8n))
+- ListBee API key from [console.listbee.so](https://console.listbee.so)
+- Slack credential configured in n8n
+
+## Workflow steps
+
+### 1. Manual trigger (or schedule)
+
+Start with a **Manual Trigger** node to run the setup once. Swap it for a **Schedule** node if you want to create listings on a recurring basis.
+
+### 2. Create the listing
+
+Add a **ListBee** node:
+
+- **Resource:** Listing
+- **Operation:** Create
+- **Name:** `Weekly Report Template`
+- **Price:** `4900` (cents — $49.00)
+- **Content type:** `static`
+- **Description:** `A plug-and-play template for weekly business reviews.`
+
+The node outputs the listing object. Use `{{ $json.id }}` to reference the listing ID in downstream nodes.
+
+<CodeBlocks>
+  <CodeBlock title="curl equivalent">
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Weekly Report Template",
+    "price": 4900,
+    "content_type": "static",
+    "description": "A plug-and-play template for weekly business reviews."
+  }'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+### 3. Register a webhook
+
+Add a second **ListBee** node:
+
+- **Resource:** Webhook
+- **Operation:** Create
+- **URL:** your n8n Webhook node URL (see step 4)
+- **Events:** `order.paid`
+
+<CodeBlocks>
+  <CodeBlock title="curl equivalent">
+```bash
+curl -X POST https://api.listbee.so/v1/webhooks \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-n8n.example.com/webhook/listbee",
+    "events": ["order.paid"]
+  }'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+Note the `id` from the response (`wh_...`) — you can use it later to update or delete the webhook.
+
+### 4. ListBee Trigger — receive orders
+
+In a separate workflow, add a **ListBee Trigger** node:
+
+- **Event:** `order.paid`
+- **Webhook URL:** copy this URL and paste it into the webhook you created in step 3
+
+This node activates whenever ListBee delivers an `order.paid` event. The full order payload is available in `$json`.
+
+### 5. Send a Slack message
+
+Connect a **Slack** node after the trigger:
+
+- **Resource:** Message
+- **Operation:** Post
+- **Channel:** `#sales`
+- **Text:**
+  ```
+  New order: {{ $json.payload.buyer_email }} paid ${{ $json.payload.amount / 100 }} for {{ $json.payload.listing_snapshot.name }}
+  ```
+
+## Order payload shape
+
+When `order.paid` fires, the event body looks like:
+
+```json
+{
+  "object": "webhook_event",
+  "id": "evt_abc123",
+  "event_type": "order.paid",
+  "payload": {
+    "object": "order",
+    "id": "ord_abc123",
+    "status": "paid",
+    "buyer_email": "buyer@example.com",
+    "amount": 4900,
+    "currency": "usd",
+    "checkout_data": {},
+    "listing_snapshot": {
+      "id": "lst_abc123",
+      "name": "Weekly Report Template",
+      "slug": "weekly-report-template"
+    }
+  },
+  "created_at": "2026-04-09T10:00:00Z"
+}
+```
+
+Use `$json.payload.buyer_email`, `$json.payload.amount`, and `$json.payload.listing_snapshot.name` in Slack messages, Google Sheets rows, or any other downstream node.
+
+## Variations
+
+**Filter by listing** — add an **IF** node after the trigger to handle events from specific listings only:
+
+```
+{{ $json.payload.listing_snapshot.id === 'lst_abc123' }}
+```
+
+**Fulfill generated content** — if `content_type` is `generated`, call the **ListBee** node with **Operation: Fulfill** after generating content, passing `order_id` and the content to deliver.
+
+**Write to a spreadsheet** — replace the Slack node with a **Google Sheets** node to log every order to a sheet.
+
+## Related
+
+- [n8n setup](/n8n)
+- [Webhooks](/webhooks)
+- [Fulfillment](/fulfillment)

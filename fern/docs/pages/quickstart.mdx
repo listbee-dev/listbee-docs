@@ -1,7 +1,145 @@
 ---
 title: Quickstart
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: From zero to a live listing in three steps
+covers_endpoints: [create_listing, add_deliverable, publish_listing]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+## Step 1: Get your API key
+
+Go to [console.listbee.so](https://console.listbee.so) and log in with your email. An OTP is sent to your inbox — no password required. Once in, copy your API key from the dashboard. It starts with `lb_`.
+
+All API requests use this key in the `Authorization` header:
+
+```
+Authorization: Bearer lb_...
+```
+
+## Step 2: Create a listing
+
+A listing is a sellable item with a hosted product page and Stripe checkout. The three required fields are `name`, `price` (in cents), and `content_type`.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+listing = client.listings.create(
+    name="SEO Playbook 2026",
+    price=1900,           # $19.00
+    content_type="static",
+)
+
+print(listing.id)          # lst_7kQ2xY9mN3pR5tW1vB8a
+print(listing.url)         # https://buy.listbee.so/seo-playbook-2026
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "SEO Playbook 2026",
+    "price": 1900,
+    "content_type": "static"
+  }'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+The response includes the listing ID, its URL slug, and the product page URL:
+
+```json
+{
+  "object": "listing",
+  "id": "lst_7kQ2xY9mN3pR5tW1vB8a",
+  "slug": "seo-playbook-2026",
+  "name": "SEO Playbook 2026",
+  "price": 1900,
+  "content_type": "static",
+  "status": "draft",
+  "url": "https://buy.listbee.so/seo-playbook-2026",
+  "deliverables": [],
+  "readiness": {
+    "sellable": false,
+    "actions": [
+      {
+        "code": "no_deliverable",
+        "kind": "api",
+        "message": "Attach a deliverable so buyers receive content after payment.",
+        "resolve": {
+          "method": "POST",
+          "endpoint": "/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables",
+          "params": null
+        }
+      }
+    ],
+    "next": "no_deliverable"
+  },
+  "created_at": "2026-04-09T10:00:00Z"
+}
+```
+
+`status` is `draft` — the listing exists but is not live yet. `readiness.sellable` will be `false` until a deliverable is attached and the listing is published.
+
+## Step 3: Attach a deliverable and publish
+
+For `static` listings, attach the content buyers receive after paying. You can attach a file (uploaded via `POST /v1/files`), a URL redirect, or raw text.
+
+This example uses a URL deliverable — no file upload needed:
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+# Attach a deliverable
+client.listings.add_deliverable(
+    listing_id=listing.id,
+    type="url",
+    value="https://example.com/seo-playbook-download",
+)
+
+# Publish the listing
+published = client.listings.publish(listing_id=listing.id)
+
+print(published.status)    # published
+print(published.url)       # https://buy.listbee.so/seo-playbook-2026
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+# Attach a deliverable
+curl -X POST https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "url",
+    "value": "https://example.com/seo-playbook-download"
+  }'
+
+# Publish the listing
+curl -X POST https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/publish \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+After publishing, the product page is live and accepting orders:
+
+```json
+{
+  "object": "listing",
+  "id": "lst_7kQ2xY9mN3pR5tW1vB8a",
+  "slug": "seo-playbook-2026",
+  "status": "published",
+  "url": "https://buy.listbee.so/seo-playbook-2026",
+  "readiness": {
+    "sellable": true,
+    "actions": [],
+    "next": null
+  }
+}
+```
+
+Share `url` with buyers. When a buyer pays, ListBee handles the Stripe checkout and delivers the content automatically.

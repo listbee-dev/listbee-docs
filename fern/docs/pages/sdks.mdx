@@ -1,7 +1,144 @@
 ---
 title: SDKs
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Official Python and TypeScript clients for the ListBee API.
+covers_endpoints: [create_listing, list_orders]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+ListBee ships first-party SDKs for Python and TypeScript. Both are thin wrappers over the REST API with typed responses, automatic retries, and cursor-based pagination helpers.
+
+## Python
+
+### Install
+
+```bash
+pip install listbee
+```
+
+Requires Python 3.9+.
+
+### Auth
+
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+```
+
+Pass `api_key` explicitly, or set the `LISTBEE_API_KEY` environment variable and call `ListBee()` with no arguments.
+
+### Create a listing
+
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+listing = client.listings.create(
+    name="Python Fundamentals",
+    price=2900,           # $29.00
+    content_type="static",
+)
+
+print(listing.id)     # lst_abc123...
+print(listing.url)    # https://buy.listbee.so/python-fundamentals
+```
+
+### List orders
+
+```python
+orders = client.orders.list(limit=20)
+
+for order in orders.data:
+    print(order.id, order.status, order.buyer_email)
+
+# Fetch next page
+if orders.has_more:
+    next_page = client.orders.list(limit=20, cursor=orders.cursor)
+```
+
+### Source
+
+[github.com/listbee-dev/listbee-python](https://github.com/listbee-dev/listbee-python)
+
+---
+
+## TypeScript
+
+### Install
+
+```bash
+npm install listbee
+```
+
+Requires Node.js 18+. Works in Deno and Bun.
+
+### Auth
+
+```typescript
+import { ListBee } from 'listbee';
+
+const client = new ListBee({ apiKey: 'lb_...' });
+```
+
+Or set `LISTBEE_API_KEY` in your environment and omit the argument.
+
+### Create a listing
+
+```typescript
+import { ListBee } from 'listbee';
+
+const client = new ListBee({ apiKey: 'lb_...' });
+
+const listing = await client.listings.create({
+  name: 'TypeScript Handbook',
+  price: 1900,           // $19.00
+  content_type: 'static',
+});
+
+console.log(listing.id);    // lst_abc123...
+console.log(listing.url);   // https://buy.listbee.so/typescript-handbook
+```
+
+### List orders
+
+```typescript
+const orders = await client.orders.list({ limit: 20 });
+
+for (const order of orders.data) {
+  console.log(order.id, order.status, order.buyer_email);
+}
+
+// Fetch next page
+if (orders.has_more) {
+  const nextPage = await client.orders.list({ limit: 20, cursor: orders.cursor });
+}
+```
+
+### Source
+
+[github.com/listbee-dev/listbee-typescript](https://github.com/listbee-dev/listbee-typescript)
+
+---
+
+## curl reference
+
+All SDK methods map 1:1 to REST endpoints. Any example can be run with curl:
+
+```bash
+# Create a listing
+curl -X POST https://api.listbee.so/v1/listings \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Python Fundamentals", "price": 2900, "content_type": "static"}'
+
+# List orders
+curl https://api.listbee.so/v1/orders \
+  -H "Authorization: Bearer lb_..."
+```
+
+## Related
+
+- [Quickstart](/quickstart)
+- [MCP server](/mcp)
+- [Authentication](/authentication)
+- [API reference](/api-reference)

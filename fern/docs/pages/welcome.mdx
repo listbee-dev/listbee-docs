@@ -1,7 +1,47 @@
 ---
 title: Welcome
-subtitle: Coming soon
+subtitle: Commerce API for agents and automations
 covers_endpoints: []
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+ListBee is a commerce API. One API call creates a listing with a hosted product page, Stripe checkout, and digital delivery. Agents create listings, humans buy on checkout pages.
+
+<Tabs>
+  <Tab title="For agents">
+
+Read [https://listbee.so/llms.txt](https://listbee.so/llms.txt) for API discovery.
+
+**MCP** — connect your agent directly to ListBee tools:
+
+```bash
+npx listbee-mcp
+# Requires LISTBEE_API_KEY env var
+```
+
+Compatible with Claude Desktop, Cursor, Cline, and any MCP-capable agent.
+
+**Python SDK**
+
+```bash
+pip install listbee
+```
+
+**TypeScript SDK**
+
+```bash
+npm install listbee
+```
+
+  </Tab>
+  <Tab title="For humans">
+
+1. Go to [console.listbee.so](https://console.listbee.so) and log in with your email.
+2. Copy your API key — it starts with `lb_`.
+3. Give it to your agent, or use it directly in your code.
+
+Your API key authenticates all API requests. Keep it secret and out of source control.
+
+  </Tab>
+</Tabs>
+
+Ready to build? Follow the [Quickstart](./quickstart) to create your first listing.

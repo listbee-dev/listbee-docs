@@ -1,7 +1,124 @@
 ---
 title: n8n
-subtitle: Coming soon
-covers_endpoints: []
+subtitle: Use the ListBee community node to build commerce workflows in n8n.
+covers_endpoints: [create_listing, create_webhook]
 ---
 
-This page is being rewritten. See the [API Reference](/api-reference) for current endpoint documentation.
+The `n8n-nodes-listbee` package adds ListBee as a native node in n8n. You can create listings, retrieve orders, manage webhooks, and trigger on incoming events — all from the n8n workflow editor.
+
+## Install
+
+In your n8n instance, go to **Settings → Community nodes** and install:
+
+```
+n8n-nodes-listbee
+```
+
+If you run n8n via Docker or npm, you can also install it directly:
+
+```bash
+npm install n8n-nodes-listbee
+```
+
+Then restart n8n. The ListBee node and ListBee Trigger node will appear in the node picker.
+
+## Configure credentials
+
+1. Open any workflow and add a **ListBee** node.
+2. Click **Credential for ListBee API** → **Create new**.
+3. Paste your API key (starts with `lb_`). Get one from [console.listbee.so](https://console.listbee.so).
+4. Click **Save**.
+
+The credential is shared across all ListBee nodes in the instance.
+
+## Basic workflow: create a listing and receive orders
+
+This workflow creates a listing on a schedule and sends a Slack message when an order arrives.
+
+### Step 1: Create a listing
+
+Add a **ListBee** node with:
+
+- **Resource:** Listing
+- **Operation:** Create
+- **Name:** `My Ebook`
+- **Price:** `1900` (cents — $19.00)
+- **Content type:** `static`
+
+The node outputs the full listing object, including `id` and `url`.
+
+### Step 2: Register a webhook
+
+Add a second **ListBee** node:
+
+- **Resource:** Webhook
+- **Operation:** Create
+- **URL:** your n8n webhook URL (e.g., `https://your-n8n.example.com/webhook/listbee-orders`)
+- **Events:** `order.paid`
+
+<CodeBlocks>
+  <CodeBlock title="curl equivalent">
+```bash
+curl -X POST https://api.listbee.so/v1/webhooks \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-n8n.example.com/webhook/listbee-orders",
+    "events": ["order.paid"]
+  }'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+### Step 3: Receive orders with the trigger node
+
+Add a **ListBee Trigger** node:
+
+- **Event:** `order.paid`
+- **Webhook URL:** copy the URL shown in the node — paste it into the webhook you created above
+
+When a buyer pays, ListBee sends an `order.paid` event to n8n. The trigger node activates and passes the full order payload downstream.
+
+### Step 4: Act on the order
+
+Connect any node after the trigger — send a Slack message, write to a Google Sheet, call an external API, generate and return content via `fulfill_order`, etc.
+
+The order payload contains:
+
+```json
+{
+  "object": "webhook_event",
+  "event_type": "order.paid",
+  "payload": {
+    "object": "order",
+    "id": "ord_abc123",
+    "status": "paid",
+    "buyer_email": "buyer@example.com",
+    "amount": 1900,
+    "currency": "usd",
+    "listing_snapshot": {
+      "id": "lst_abc123",
+      "name": "My Ebook"
+    }
+  }
+}
+```
+
+## Available operations
+
+| Resource | Operations |
+|----------|-----------|
+| Listing | Create, Get, List, Update, Delete, Add deliverable, Publish |
+| Order | Get, List, Fulfill, Refund |
+| Webhook | Create, Get, List, Update, Delete, Test |
+| Webhook event | List, Retry |
+| File | Upload |
+| Account | Get, Update |
+| API key | Create, List, Delete |
+
+## Related
+
+- [Webhooks](/webhooks)
+- [Fulfillment](/fulfillment)
+- [Sell from n8n (example)](/example-n8n)
+- [API reference](/api-reference)

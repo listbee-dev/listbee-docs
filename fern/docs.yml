@@ -40,105 +40,74 @@ navigation:
         contents:
           - page: Welcome
             path: ./docs/pages/welcome.mdx
-          - page: Introduction
-            path: ./docs/pages/introduction.mdx
           - page: Quickstart
             path: ./docs/pages/quickstart.mdx
 
       - section: Core Concepts
         skip-slug: true
         contents:
+          - page: Authentication
+            path: ./docs/pages/authentication.mdx
           - page: Listings
             path: ./docs/pages/listings.mdx
-          - page: Listing Lifecycle
-            slug: listing-lifecycle
-            path: ./docs/pages/listing-lifecycle.mdx
-          - page: Orders & Delivery
-            slug: orders
+          - page: Orders
             path: ./docs/pages/orders.mdx
-          - page: Fulfillment Modes
-            slug: fulfillment-modes
-            path: ./docs/pages/fulfillment-modes.mdx
-          - page: Deliverables
-            slug: deliverables
-            path: ./docs/pages/deliverables.mdx
-          - page: Readiness System
-            slug: readiness
+          - page: Fulfillment
+            path: ./docs/pages/fulfillment.mdx
+          - page: Readiness
             path: ./docs/pages/readiness.mdx
-          - page: Account
-            path: ./docs/pages/account.mdx
-          - page: Payments
-            path: ./docs/pages/payments.mdx
-          - page: Billing
-            path: ./docs/pages/billing.mdx
           - page: Webhooks
             path: ./docs/pages/webhooks.mdx
-          - page: Errors
-            path: ./docs/pages/errors.mdx
-          - page: Entity Model
-            slug: entity-model
-            path: ./docs/pages/entity-model.mdx
-
-      - section: Agent Integration
-        skip-slug: true
-        contents:
-          - page: Agent Onboarding Flow
-            slug: agent-onboarding
-            path: ./docs/pages/agent-onboarding.mdx
-          - page: MCP Server
-            slug: mcp
-            path: ./docs/pages/mcp.mdx
-          - page: Claude Code Skill
-            slug: claude-code-skill
-            path: ./docs/pages/claude-code-skill.mdx
 
       - section: Guides
         skip-slug: true
         contents:
-          - page: Authentication
-            path: ./docs/pages/authentication.mdx
-          - page: Idempotency
-            path: ./docs/pages/idempotency.mdx
-          - page: Rate Limits
-            path: ./docs/pages/rate-limits.mdx
           - page: Checkout Schema
             slug: checkout-schema
             path: ./docs/pages/checkout-schema.mdx
-          - page: Selling Physical Products
-            slug: physical-products
-            path: ./docs/pages/physical-products.mdx
-          - page: Dynamic Fulfillment
-            slug: dynamic-fulfillment
-            path: ./docs/pages/dynamic-fulfillment.mdx
-          - page: Webhook Delivery Logs
-            slug: webhook-delivery-logs
-            path: ./docs/pages/webhook-delivery-logs.mdx
-          - page: Google Analytics tracking
-            slug: analytics
-            path: ./docs/pages/analytics.mdx
+          - page: Idempotency
+            path: ./docs/pages/idempotency.mdx
+          - page: Rate Limits
+            slug: rate-limits
+            path: ./docs/pages/rate-limits.mdx
+          - page: Errors
+            path: ./docs/pages/errors.mdx
+
+      - section: Integration
+        skip-slug: true
+        contents:
+          - page: MCP Server
+            slug: mcp
+            path: ./docs/pages/mcp.mdx
+          - page: SDKs
+            path: ./docs/pages/sdks.mdx
+          - page: n8n
+            path: ./docs/pages/n8n.mdx
 
       - section: Examples
         skip-slug: true
         contents:
           - page: Sell from Claude Code
+            slug: example-claude-code
             path: ./docs/pages/example-claude-code.mdx
           - page: Sell from n8n
+            slug: example-n8n
             path: ./docs/pages/example-n8n.mdx
-          - page: Build a Storefront API
+          - page: Build a Storefront
+            slug: example-storefront
             path: ./docs/pages/example-storefront.mdx
 
       - section: Resources
         skip-slug: true
         contents:
-          - page: FAQ
-            path: ./docs/pages/faq.mdx
-          - page: Limitations
-            path: ./docs/pages/limitations.mdx
+          - page: Entity Model
+            slug: entity-model
+            path: ./docs/pages/entity-model.mdx
           - page: OpenAPI Spec
             slug: openapi
             path: ./docs/pages/openapi.mdx
-          - page: Community
-            path: ./docs/pages/community.mdx
+          - page: Limitations
+            path: ./docs/pages/limitations.mdx
 
   - tab: api
     layout:

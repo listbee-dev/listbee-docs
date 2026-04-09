@@ -157,13 +157,84 @@ curl -X POST https://api.listbee.so/v1/listings \
 
 ## Deliverable types
 
-| Type | How to set | What the buyer receives |
-|------|-----------|------------------------|
-| `file` | Upload via `POST /v1/files`, pass token | Signed download URL (72h expiry, 10 downloads) |
-| `url` | Pass URL in `value` field | Redirect to that URL |
-| `text` | Pass text in `value` field | Text rendered on download page |
+A deliverable is what the buyer receives after payment. Each has a `type` and either a `token` (for files) or a `value` (for URLs and text). Up to 3 deliverables per listing or per `fulfill` call. Mixed types allowed.
 
-Up to 3 deliverables per listing or per `fulfill` call. Mixed types are allowed.
+| Type | Field | What the buyer gets | Limits |
+|------|-------|-------------------|--------|
+| `file` | `token` from `POST /v1/files` | Signed download URL | 100 MB max, 48h expiry, 10 downloads |
+| `url` | `value` — any URL | Redirect to that URL | No size limit |
+| `text` | `value` — literal string | Text rendered on download page | 10,000 chars |
+
+### File deliverable
+
+Upload first, then reference the token. Two steps:
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+# Step 1: Upload the file
+file = client.files.upload(open("ebook.pdf", "rb"))
+print(file.id)  # file_7kQ2xY9mN3pR5tW1vB8a01
+
+# Step 2: Attach to listing
+client.listings.set_deliverables(
+    listing_id="lst_abc123",
+    deliverables=[{"type": "file", "token": file.id}],
+)
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+# Step 1: Upload
+curl -X POST https://api.listbee.so/v1/files \
+  -H "Authorization: Bearer lb_..." \
+  -F "file=@ebook.pdf"
+# Returns: {"object": "file", "id": "file_7kQ2xY9mN3pR5tW1vB8a01", ...}
+
+# Step 2: Attach
+curl -X PUT https://api.listbee.so/v1/listings/lst_abc123/deliverables \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"deliverables": [{"type": "file", "token": "file_7kQ2xY9mN3pR5tW1vB8a01"}]}'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+After payment, the buyer gets an access grant with a signed download URL. The grant expires after 48 hours or 10 downloads, whichever comes first.
+
+### URL deliverable
+
+Direct redirect — the buyer clicks the download link and is sent to your URL. No file hosting needed.
+
+```json
+{"type": "url", "value": "https://cdn.example.com/guide.pdf"}
+```
+
+Use this for content already hosted elsewhere (S3, Google Drive shared links, Notion pages, Gumroad-style external downloads).
+
+### Text deliverable
+
+Literal text rendered on the download page. Good for license keys, passwords, short instructions, or generated content.
+
+```json
+{"type": "text", "value": "Your license key: ABC-123-XYZ\n\nActivate at https://example.com/activate"}
+```
+
+### Mixing types
+
+A single listing can combine all three:
+
+```json
+{
+  "deliverables": [
+    {"type": "file", "token": "file_7kQ2xY9mN3pR5tW1vB8a01"},
+    {"type": "url", "value": "https://community.example.com/invite/abc"},
+    {"type": "text", "value": "Welcome! Your login: user@example.com / temp-pass-123"}
+  ]
+}
+```
+
+The buyer sees all three on their download page after payment.
 
 ## Related
 

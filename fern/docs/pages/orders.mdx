@@ -76,13 +76,25 @@ Call `fulfill` on any `paid` order to push content to the buyer. ListBee creates
 <CodeBlocks>
   <CodeBlock title="Python">
 ```python
-# After generating content in response to an order.paid webhook:
+from listbee import Deliverable
+
 client.orders.fulfill(
     order_id="ord_9xM4kP7nR2qT5wY1",
     deliverables=[
-        {"type": "text", "value": "Your personalized report: ..."},
+        Deliverable.text("Your personalized report: ..."),
     ],
 )
+```
+  </CodeBlock>
+  <CodeBlock title="TypeScript">
+```typescript
+import { Deliverable } from 'listbee';
+
+await client.orders.fulfill('ord_9xM4kP7nR2qT5wY1', {
+  deliverables: [
+    Deliverable.text('Your personalized report: ...'),
+  ],
+});
 ```
   </CodeBlock>
   <CodeBlock title="curl">
@@ -99,7 +111,7 @@ curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill \
   </CodeBlock>
 </CodeBlocks>
 
-Deliverable types are `file` (token from `POST /v1/files`), `url`, or `text`. Up to 3 per order.
+Same deliverable types as listing attachments — `file`, `url`, `text`. Up to 3 per call, mixed types allowed. The `Deliverable` builder handles file uploads automatically. See [Deliverables](/docs/deliverables) for types, hosting, and limits.
 
 ## Issuing a refund
 

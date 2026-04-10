@@ -14,11 +14,11 @@ Three types, each covering a different hosting model:
 
 | Type | Input | What buyer sees | Who hosts | Limits |
 |------|-------|----------------|-----------|--------|
-| `file` | `token` from `POST /v1/files` | Signed download link | ListBee (Bunny CDN) | 25 MB per file |
+| `file` | `token` from `POST /v1/files` | Signed download link | ListBee (CDN) | 25 MB per file |
 | `url` | `value` — any URL | Redirect to your URL | You | No size limit |
 | `text` | `value` — literal string | Text on the download page | ListBee renders it | 10,000 chars |
 
-**File** — ListBee hosts the file on Bunny CDN. Upload via `POST /v1/files`, get a token, reference the token when attaching deliverables. After payment, the buyer gets a signed download URL that expires in minutes. Supported formats: PDF, EPUB, ZIP, images (PNG, JPEG, GIF, WebP, SVG), audio (MP3, WAV, FLAC, AAC, OGG), video (MP4, WebM, MOV), and Office documents (DOCX, XLSX, PPTX).
+**File** — ListBee hosts the file on CDN. Upload via `POST /v1/files`, get a token, reference the token when attaching deliverables. After payment, the buyer gets a signed download URL that expires in minutes. Supported formats: PDF, EPUB, ZIP, images (PNG, JPEG, GIF, WebP, SVG), audio (MP3, WAV, FLAC, AAC, OGG), video (MP4, WebM, MOV), and Office documents (DOCX, XLSX, PPTX).
 
 **URL** — You host the content. ListBee redirects the buyer to your URL on the download page. Use for content already on S3, Google Drive, Notion, or any link you control. ListBee does not validate or cache the URL — if it goes down, the buyer sees a broken link. You are responsible for access control on the destination.
 
@@ -65,7 +65,7 @@ curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/delivera
 
 File tokens expire after 24 hours. If a token expires before you attach it, upload the file again. Once attached, the file is permanent — the token expiry no longer applies.
 
-Files are stored on Bunny CDN. Buyers never see the raw CDN path. Tokens are references, not content — the same token works in both `set_deliverables` and `/fulfill`.
+Files are stored on CDN. Buyers never see the raw CDN path. Tokens are references, not content — the same token works in both `set_deliverables` and `/fulfill`.
 
 ## Attaching to a listing
 

@@ -52,7 +52,7 @@ print(f"Sellable: {published.readiness.sellable}")  # True
 
 **Step 1 — Create listing.** The listing is created in `draft` status. The `readiness` object in the response includes a `configure_fulfillment` action pointing to the next call.
 
-**Step 2 — Upload file.** `POST /v1/files` uploads the file to Bunny CDN and returns a `token`. The token is a reference — it doesn't contain the file content.
+**Step 2 — Upload file.** `POST /v1/files` uploads the file to CDN and returns a `token`. The token is a reference — it doesn't contain the file content.
 
 **Step 3 — Attach deliverable.** `POST /v1/listings/{id}/deliverables` links the uploaded file to the listing. Buyers receive a signed download link valid for 48 hours and up to 10 downloads after payment.
 

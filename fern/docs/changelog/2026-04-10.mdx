@@ -1,0 +1,32 @@
+---
+title: Agent guidance layer
+date: 2026-04-10
+---
+
+## Unified readiness and error enrichment
+
+Readiness and error responses now speak the same language. When an operation fails because of unmet readiness, the error response includes the same structured guidance you get from a GET request — no follow-up call needed.
+
+### New on errors
+
+- **Extension members** — errors now include RFC 9457 extension members with structured metadata: `current_status`, `allowed_statuses`, `current_count`, `max_count`, `retry_after`, and readiness `actions`.
+- **`publish_failed`** returns the full readiness `actions` array inline.
+- **`not_in_draft`** returns `current_status` and `required_status`.
+- **`invalid_transition`** returns `current_status` and `allowed_statuses`.
+- **Deliverable `conflict`** returns `current_count` and `max_count`.
+- **`rate_limited`** now includes `retry_after` in the response body (matches the `Retry-After` header).
+
+### Refund error codes
+
+The refund endpoint now returns specific error codes instead of a generic `validation_error`:
+- `refund_not_allowed` — order is not in a refundable status
+- `missing_payment_intent` — no payment to refund
+- `missing_stripe_connection` — seller's Stripe is disconnected
+
+### Order readiness
+
+Orders now include a `readiness` object with a `fulfilled` flag. `paid` orders that haven't been delivered show a `fulfill_order` action.
+
+### SDK extras
+
+Python SDK v0.18.0 and TypeScript SDK v0.16.0 expose `error.extras` — a dict/object of all RFC 9457 extension members from the error response.

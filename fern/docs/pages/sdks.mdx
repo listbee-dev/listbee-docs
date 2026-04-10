@@ -118,6 +118,57 @@ if (orders.has_more) {
 
 ---
 
+## Error handling
+
+Both SDKs raise typed exceptions for API errors. Every exception includes an `extras` dict/object containing RFC 9457 extension members — structured metadata that helps your code react to specific failure modes.
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+from listbee import ListBee
+from listbee.exceptions import ConflictError, RateLimitError
+
+client = ListBee(api_key="lb_...")
+
+try:
+    client.listings.publish(listing_id="lst_abc123")
+except ConflictError as e:
+    if e.code == "publish_failed":
+        # Readiness actions tell you exactly what to fix
+        for action in e.extras.get("actions", []):
+            print(f"→ {action['message']}")
+    elif e.code == "not_in_draft":
+        print(f"Status is {e.extras['current_status']}, need draft")
+except RateLimitError as e:
+    wait = e.extras.get("retry_after", 10)
+    print(f"Rate limited — retry in {wait}s")
+```
+</CodeBlock>
+<CodeBlock title="TypeScript">
+```typescript
+import { ListBee, ConflictError, RateLimitError } from 'listbee';
+
+const client = new ListBee({ apiKey: 'lb_...' });
+
+try {
+  await client.listings.publish('lst_abc123');
+} catch (e) {
+  if (e instanceof ConflictError && e.code === 'publish_failed') {
+    const actions = e.extras.actions as Array<{ message: string }>;
+    actions?.forEach(a => console.log(`→ ${a.message}`));
+  } else if (e instanceof RateLimitError) {
+    const wait = (e.extras.retry_after as number) ?? 10;
+    console.log(`Rate limited — retry in ${wait}s`);
+  }
+}
+```
+</CodeBlock>
+</CodeBlocks>
+
+See [Errors](/errors#extension-members) for the full list of enriched error codes and their extension members.
+
+---
+
 ## curl reference
 
 All SDK methods map 1:1 to REST endpoints. Any example can be run with curl:

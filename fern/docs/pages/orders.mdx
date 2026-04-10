@@ -202,6 +202,12 @@ Every order response includes a `readiness` object with a `fulfilled` flag — `
 | `refund_amount` | integer | Amount refunded in cents; `0` if not refunded |
 | `paid_at` | string | When payment was confirmed |
 | `fulfilled_at` | string | When order was fulfilled |
+| `refunded_at` | string \| null | When the refund was processed |
+| `dispute_status` | string \| null | Stripe dispute status if disputed |
+| `dispute_reason` | string \| null | Reason for the dispute |
+| `dispute_amount` | integer | Disputed amount in cents; `0` if not disputed |
+| `disputed_at` | string \| null | When the dispute was opened |
+| `created_at` | string | When the order was created |
 
 ## Related
 

@@ -24,7 +24,8 @@ Three steps, one focus each. The agent drives the flow, the human verifies their
 ```python
 from listbee import ListBee
 
-result = ListBee.bootstrap.start(email="seller@example.com")
+client = ListBee()  # no api_key needed for bootstrap
+result = client.bootstrap.start(email="seller@example.com")
 session = result.session
 # Ask the human: "Check your email for a 6-digit code"
 ```
@@ -55,7 +56,7 @@ The human reads the 6-digit code from their email. The agent passes it back.
 <CodeBlocks>
 <CodeBlock title="Python">
 ```python
-result = ListBee.bootstrap.verify(session=session, code="847291")
+result = client.bootstrap.verify(session=session, code="847291")
 ```
 </CodeBlock>
 <CodeBlock title="curl">
@@ -74,7 +75,7 @@ If the email is new, an account is created. If it already exists, the existing a
 <CodeBlocks>
 <CodeBlock title="Python">
 ```python
-store = ListBee.bootstrap.create_store(
+store = client.bootstrap.create_store(
     session=session,
     store_name="SEO Pro"
 )

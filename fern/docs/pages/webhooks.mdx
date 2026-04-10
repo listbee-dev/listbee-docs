@@ -82,7 +82,7 @@ Passing an empty `events` array subscribes to all events.
     "has_deliverables": false,
     "listing_metadata": {},
     "checkout_data": {"note": "Gift wrap please"},
-    "fulfill_url": "/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill",
+    "fulfill_url": "https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill",
     "paid_at": "2026-04-09T14:30:00Z"
   }
 }
@@ -244,4 +244,4 @@ curl -X DELETE https://api.listbee.so/v1/webhooks/wh_7kQ2xY9mN3pR5tW1vB8a \
 
 - [Fulfillment](/docs/fulfillment) — `order.paid` drives delivery for `generated` and `webhook` listings
 - [Orders](/docs/orders) — order lifecycle and the events that fire at each transition
-- [Readiness](/docs/readiness) — `configure_webhook` and `webhook_disabled` actions
+- [Readiness](/docs/readiness) — `configure_fulfillment` and `webhook_disabled` actions

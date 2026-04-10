@@ -1,14 +1,14 @@
 ---
 title: Readiness
 subtitle: Actionable setup state on accounts and listings
-covers_endpoints: [get_account, get_listing]
+covers_endpoints: [get_account, get_listing, get_order]
 ---
 
 The `readiness` object appears on both account and listing responses. It tells you whether the resource is operational and, if not, exactly what to do next. Agents can consume readiness programmatically to drive setup workflows without hardcoding business rules.
 
 ## How it works
 
-Every `GET /v1/account` and `GET /v1/listings/{id}` response includes a `readiness` object. It has three fields:
+Every account, listing, and order response includes a `readiness` object. It has three fields:
 
 - **`operational`** (account) or **`sellable`** (listing) — `true` when the resource is ready to use.
 - **`actions`** — array of steps to take, each with a code, kind, message, and resolve instructions.
@@ -36,6 +36,7 @@ When `actions` is empty, the resource is ready. When `actions` is non-empty, wor
 |-------|------|-------------|
 | `code` | string | Machine-readable identifier for branching logic |
 | `kind` | string | `api` — agent can call the endpoint directly; `human` — requires browser redirect |
+| `priority` | string | `required` — blocks progress; `suggested` — available opportunity |
 | `message` | string | Human-readable explanation; safe to relay to users |
 | `resolve.method` | string | HTTP method, or `redirect` for human actions |
 | `resolve.endpoint` | string | API path for `kind: api` actions |
@@ -126,6 +127,38 @@ curl https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a \
   </CodeBlock>
 </CodeBlocks>
 
+## Order readiness
+
+`GET /v1/orders/{id}` and order list responses include `readiness.fulfilled`. An order is fulfilled when content has been delivered to the buyer.
+
+`paid` orders that are not yet fulfilled include a `fulfill_order` action — your agent can push content via `POST /v1/orders/{id}/fulfill`.
+
+```json
+{
+  "object": "order",
+  "id": "ord_9xM4kP7nR2qT5wY1",
+  "status": "paid",
+  "readiness": {
+    "fulfilled": false,
+    "actions": [
+      {
+        "code": "fulfill_order",
+        "kind": "api",
+        "priority": "suggested",
+        "message": "Deliver content to buyer via ListBee",
+        "resolve": {
+          "method": "POST",
+          "endpoint": "/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill"
+        }
+      }
+    ],
+    "next": null
+  }
+}
+```
+
+`fulfill_order` uses `priority: suggested` rather than `required` — delivery via ListBee is optional. Sellers can handle delivery externally.
+
 ## Common action codes
 
 | Code | Kind | When it appears | Resolution |
@@ -133,10 +166,10 @@ curl https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a \
 | `connect_stripe` | `api` | No Stripe account connected | `POST /v1/account/stripe/connect` — returns onboarding URL |
 | `enable_charges` | `human` | Stripe connected but onboarding incomplete | Redirect to Stripe onboarding via console |
 | `update_billing` | `human` | Billing past due or unpaid | Redirect to billing page in console |
-| `attach_deliverable` | `api` | `static` listing has no deliverables | `POST /v1/listings/{id}/deliverables` |
-| `configure_webhook` | `api` | `generated` or `webhook` listing has no active `order.paid` webhook | `POST /v1/webhooks` |
+| `configure_fulfillment` | `api` | External listing has no fulfillment path (no deliverables, no webhook, no fulfillment_url) | `PATCH /v1/listings/{id}` with `fulfillment_url` |
 | `publish_listing` | `api` | All other blockers cleared; listing still in draft | `POST /v1/listings/{id}/publish` |
 | `webhook_disabled` | `api` | Webhook was auto-disabled after consecutive failures | Re-enable or replace the webhook |
+| `fulfill_order` | `api` | PAID order not yet fulfilled | `POST /v1/orders/{id}/fulfill` |
 
 ## Walking an agent through setup
 
@@ -158,8 +191,16 @@ for action in account.readiness.actions:
 
 `publish_listing` always appears last in the actions list, only when all other blockers are cleared. This pattern — resolve each action and re-fetch — converges to `sellable: true`.
 
+## Readiness and errors
+
+When an operation fails because of unmet readiness (e.g. publishing an incomplete listing), the error response mirrors the readiness structure. The `publish_failed` error includes the same `actions` and `next` fields — your agent doesn't need to make a follow-up GET to discover what's wrong.
+
+See [Errors](/errors#extension-members) for the full list of enriched error codes.
+
 ## Related
 
 - [Authentication](/docs/authentication) — getting an API key before setup begins
 - [Listings](/docs/listings) — listing state and the publish step
-- [Webhooks](/docs/webhooks) — configuring webhooks to clear `configure_webhook` actions
+- [Webhooks](/docs/webhooks) — configuring webhooks to clear `configure_fulfillment` actions
+- [Errors](/errors) — how failed operations echo readiness guidance
+- [Orders](/orders) — order readiness and the fulfill workflow

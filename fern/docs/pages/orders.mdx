@@ -132,7 +132,13 @@ curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/refund \
   </CodeBlock>
 </CodeBlocks>
 
-Only orders with `status: paid` or `status: fulfilled` can be refunded. Refunds are processed through Stripe on the seller's connected account. The platform fee is not returned to the seller.
+Only orders with `status: paid` or `status: fulfilled` can be refunded. The API returns specific error codes for each failure case:
+
+- `refund_not_allowed` — order is in a status that cannot be refunded (includes `current_status` and `allowed_statuses`)
+- `missing_payment_intent` — order has no Stripe payment to refund
+- `missing_stripe_connection` — seller's Stripe account is disconnected
+
+Refunds are processed through Stripe on the seller's connected account. The platform fee is not returned to the seller.
 
 ## Order status lifecycle
 
@@ -144,32 +150,32 @@ Only orders with `status: paid` or `status: fulfilled` can be refunded. Refunds 
 | `canceled` | Checkout abandoned or payment failed after 24h |
 | `failed` | System error during payment or delivery |
 
-## Actions
+## Order readiness
 
-`paid` orders include a `readiness.actions` array listing suggested next steps. When no actions apply, the field is omitted.
+Every order response includes a `readiness` object with a `fulfilled` flag — `true` when content has been delivered to the buyer.
 
-A `FULFILL_ORDER` action appears on `paid` orders that have no deliverables — it signals that your agent can push content via `POST /v1/orders/{id}/fulfill`.
+`paid` orders that are not yet fulfilled include a `fulfill_order` action suggesting your agent push content via the fulfill endpoint. Fulfilled, canceled, and failed orders have empty actions.
 
 ```json
 {
   "object": "order",
   "id": "ord_9xM4kP7nR2qT5wY1",
   "status": "paid",
-  "has_deliverables": false,
   "readiness": {
+    "fulfilled": false,
     "actions": [
       {
-        "code": "FULFILL_ORDER",
+        "code": "fulfill_order",
         "kind": "api",
         "priority": "suggested",
-        "message": "Push deliverables to fulfill this order.",
+        "message": "Deliver content to buyer via ListBee",
         "resolve": {
           "method": "POST",
           "endpoint": "/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill"
         }
       }
     ],
-    "next": "FULFILL_ORDER"
+    "next": null
   }
 }
 ```
@@ -190,7 +196,7 @@ A `FULFILL_ORDER` action appears on `paid` orders that have no deliverables — 
 | `listing_snapshot` | object | Immutable copy of listing data at payment time |
 | `seller_snapshot` | object | Immutable copy of seller identity at payment time |
 | `deliverables` | array | Content attached to this order |
-| `actions` | array | Suggested next steps for `paid` orders; omitted when empty |
+| `readiness` | object | Readiness status: `fulfilled` flag + `actions` array with next steps |
 | `stripe_payment_intent_id` | string | Stripe PaymentIntent ID for cross-referencing |
 | `platform_fee` | integer | Platform fee deducted in cents |
 | `refund_amount` | integer | Amount refunded in cents; `0` if not refunded |

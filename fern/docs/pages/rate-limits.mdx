@@ -28,11 +28,12 @@ When you exceed a limit, the API returns `429 Too Many Requests` with a `Retry-A
   "title": "Rate Limited",
   "status": 429,
   "detail": "Rate limit exceeded. Try again in 12 seconds.",
-  "code": "rate_limited"
+  "code": "rate_limited",
+  "retry_after": 12
 }
 ```
 
-The `Retry-After` header is set to the number of seconds remaining in the current window.
+The `Retry-After` header and `retry_after` body field both contain the number of seconds remaining in the current window. The body field is an RFC 9457 extension member — agents can read it without parsing headers.
 
 ## Handling 429s in Python
 
@@ -53,7 +54,7 @@ def create_listing_with_backoff(title: str, price: int, max_retries: int = 4):
         except RateLimitError as e:
             if attempt == max_retries - 1:
                 raise
-            wait = e.retry_after or (2 ** attempt)
+            wait = e.extras.get("retry_after") or (2 ** attempt)
             time.sleep(wait)
     raise RuntimeError("unreachable")
 ```

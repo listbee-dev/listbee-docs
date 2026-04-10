@@ -23,9 +23,9 @@ An **Account** is the root entity. Everything belongs to an account. One account
 
 **Listings** are the sellable items an account creates. Each listing has a hosted product page at `buy.listbee.so/{slug}`. Listings belong to an account and can have up to three deliverables.
 
-**Orders** are created when a buyer submits a checkout form. They progress through a state machine from `pending` (form submitted, awaiting payment) to a terminal state (`fulfilled`, `handed_off`, `canceled`, or `failed`). Each order holds a snapshot of the listing and seller at time of purchase.
+**Orders** are created when a buyer submits a checkout form. They progress through a state machine from `pending` (form submitted, awaiting payment) to a terminal state (`fulfilled`, `canceled`, or `failed`). Each order holds a snapshot of the listing and seller at time of purchase.
 
-**AccessGrants** are created automatically when a `static` order reaches `fulfilled`. They contain a signed download token valid for 48 hours and up to 10 downloads. Buyers access their content through this token — ListBee never emails download links directly.
+**AccessGrants** are created automatically when an order reaches `fulfilled`. They contain a signed download token valid for 48 hours and up to 10 downloads. Buyers access their content through this token — ListBee never emails download links directly.
 
 **Webhooks** are outbound HTTP endpoints you configure to receive events. Each webhook filters by event type and has a signing secret (`whsec_...`) for payload verification.
 
@@ -57,31 +57,17 @@ IDs use base62 encoding over a UUID4 and are always 22 characters after the pref
 | `published` | Live. Product page accepts orders. |
 | `archived` | Taken offline. Product page returns 404. |
 
-A listing can only be published once it has a deliverable (for `static` content type) and the account has completed Stripe Connect onboarding.
+A listing can be published once the account has completed Stripe Connect onboarding. Listings with deliverables deliver automatically on payment. Listings without deliverables rely on a webhook or `fulfillment_url` callback for delivery — both paths satisfy the readiness check.
 
 ## Order states
 
-| Status | Content type | Description |
-|--------|-------------|-------------|
-| `pending` | all | Buyer submitted form, awaiting payment |
-| `paid` | all | Stripe confirmed payment |
-| `processing` | generated | Waiting for agent to call `fulfill_order` |
-| `fulfilled` | static, generated | Buyer received content |
-| `handed_off` | webhook | External system confirmed delivery |
-| `canceled` | all | Abandoned or manually canceled (24h TTL on `pending`) |
-| `failed` | all | Payment failed |
-
-## Content types
-
-The `content_type` field on a listing controls who delivers the content and when:
-
-| Content type | Deliverable required? | Who fulfills | Order terminal state |
-|-------------|----------------------|-------------|---------------------|
-| `static` | Yes (FILE, URL, or TEXT) | ListBee (automatic) | `fulfilled` |
-| `generated` | No | Agent (calls `fulfill_order`) | `fulfilled` |
-| `webhook` | No | Seller/app | `handed_off` |
-
-Content type is set at creation, mutable while `draft`, and frozen on publish.
+| Status | Description |
+|--------|-------------|
+| `pending` | Buyer submitted form, awaiting payment |
+| `paid` | Stripe confirmed payment; delivery in progress |
+| `fulfilled` | Buyer received content |
+| `canceled` | Abandoned or manually canceled (24h TTL on `pending`) |
+| `failed` | Payment or delivery error |
 
 ## Deliverable types
 
@@ -89,7 +75,7 @@ Each listing can have up to three deliverables in any combination:
 
 | Type | What it is | Delivered as |
 |------|-----------|-------------|
-| `FILE` | Uploaded file (PDF, ZIP, etc.) | Signed download URL (72h, 10 page views) |
+| `FILE` | Uploaded file (PDF, ZIP, etc.) | Signed download URL (48h, 10 downloads) |
 | `URL` | External link | Redirect on the download page |
 | `TEXT` | Raw text (license key, instructions, etc.) | Rendered on the download page |
 
@@ -98,12 +84,12 @@ Each listing can have up to three deliverables in any combination:
 | Event | When |
 |-------|------|
 | `order.paid` | Buyer's payment succeeded |
-| `order.fulfilled` | Order delivery confirmed (all content types) |
+| `order.fulfilled` | Order delivery confirmed |
 | `order.refunded` | Refund issued |
 | `order.canceled` | Order abandoned or canceled |
 | `listing.published` | Listing went live |
 
-Both `order.paid` and `order.fulfilled` fire for all content types. Agents relying on `order.fulfilled` as the delivery signal will work consistently regardless of content type.
+Both `order.paid` and `order.fulfilled` fire for every order. Agents relying on `order.fulfilled` as the delivery signal will work consistently regardless of how the listing is configured.
 
 ## Related
 

@@ -1,0 +1,114 @@
+---
+title: Stores
+subtitle: Brand identity and agent scoping — each store has its own name, listings, and API key
+covers_endpoints: [get_store, update_store, bootstrap_start, bootstrap_verify, bootstrap_store]
+---
+
+A store is the brand layer in ListBee. It holds the display name, bio, and avatar that appear on product pages. Each store has exactly one API key — when an agent authenticates, it operates within that store's scope.
+
+Stores sit between accounts and listings:
+
+```
+Account (human identity + Stripe)
+└── Store (brand + API key)
+    ├── Listings
+    ├── Orders (via listings)
+    └── Webhooks
+```
+
+One account can have multiple stores. All stores on an account share the same Stripe connection — the human does KYC once, every store can sell.
+
+## How it works
+
+Stores are created through the [bootstrap flow](/authentication). When an agent bootstraps, it provides a store name. The API creates the store, generates an API key, and returns both. The agent uses that key for all subsequent requests.
+
+Everything the agent does is scoped to its store. `GET /v1/listings` returns only that store's listings. `GET /v1/orders` returns only orders from that store's listings. Agents never see resources from other stores on the same account.
+
+## Key fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Stable store ID (`st_` prefix). Never changes. |
+| `display_name` | string | Brand name shown on product pages and store landing page. |
+| `slug` | string | URL-safe identifier. Globally unique. Used in `buy.listbee.so/{slug}`. |
+| `bio` | string \| null | Short brand description. |
+| `avatar_url` | string \| null | Brand avatar image URL. |
+| `url` | string | Public store URL: `buy.listbee.so/{slug}`. Shows all published listings. |
+| `readiness` | object | Store-level readiness. `sellable` is true when the account has Stripe connected. |
+
+## Store readiness
+
+Store readiness tells the agent whether listings in this store can accept payment.
+
+```json
+{
+  "readiness": {
+    "sellable": false,
+    "actions": [
+      {
+        "code": "connect_stripe",
+        "kind": "human",
+        "priority": "required",
+        "message": "Connect Stripe to accept payments",
+        "resolve": { "method": "redirect", "url": "https://console.listbee.so/stripe/connect" }
+      }
+    ],
+    "next": "connect_stripe"
+  }
+}
+```
+
+The only store-level gate is Stripe. Once connected, `sellable` becomes `true` and listings can take payment immediately after publish.
+
+## Store landing page
+
+Every store has a public landing page at `buy.listbee.so/{slug}`. It shows all published listings with the store's branding. Useful for sharing a single link or providing a URL during Stripe Connect verification.
+
+## Example
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+# Get current store
+store = client.store.get()
+print(store.display_name)  # "Acme Agency"
+print(store.url)           # "https://buy.listbee.so/acme-agency"
+print(store.readiness.sellable)  # True if Stripe connected
+
+# Update branding
+client.store.update(
+    display_name="Acme Digital",
+    bio="Premium digital products for modern teams",
+)
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+# Get store
+curl https://api.listbee.so/v1/store \
+  -H "Authorization: Bearer lb_..."
+
+# Update store
+curl -X PUT https://api.listbee.so/v1/store \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"display_name": "Acme Digital", "bio": "Premium digital products"}'
+```
+</CodeBlock>
+</CodeBlocks>
+
+## Multiple stores
+
+A second agent bootstrapping with the same email creates a new store on the existing account. The second store inherits the Stripe connection — it's immediately sellable if Stripe was already connected.
+
+Each store has its own API key, listings, webhooks, and slug. Stores are independent brands under one billing account.
+
+## Related
+
+- [Authentication](/authentication) — how to create a store via bootstrap
+- [Readiness](/readiness) — how readiness works at store and listing levels
+- [Listings](/listings) — creating and managing listings within a store

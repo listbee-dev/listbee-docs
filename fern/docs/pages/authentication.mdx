@@ -1,123 +1,135 @@
 ---
 title: Authentication
-subtitle: How to create and use API keys to authenticate requests
-covers_endpoints: [create_api_key, list_api_keys, delete_api_key]
+subtitle: Bootstrap a store and get an API key in three steps — no console required
+covers_endpoints: [bootstrap_start, bootstrap_verify, bootstrap_store, get_store]
 ---
 
-All ListBee API requests authenticate with an API key passed as a Bearer token. Keys have the prefix `lb_` and are scoped to a single account.
+All ListBee API requests authenticate with an API key passed as a Bearer token. Keys have the prefix `lb_` and are tied to a [store](/stores).
 
-## How it works
+## Two ways to get a key
 
-API keys are created in the [developer console](https://console.listbee.so) or via the API. The console uses email OTP login — no password, no signup endpoint. Once you have an account, every API request carries your key in the `Authorization` header.
+1. **Bootstrap API** (agent-driven) — the agent creates a store and gets a key via 3 API calls. A human provides their email and an OTP code.
+2. **Console** (human-driven) — sign in at [console.listbee.so](https://console.listbee.so). A default store and key are created on first login.
 
-Keys are permanent until deleted. There is no expiry. You can create multiple keys — one per agent, integration, or environment — and revoke individual keys without disrupting others.
+Both paths produce the same result: a store with an API key.
 
-The full key value is returned once at creation. ListBee does not store it in retrievable form. If you lose a key, delete it and create a new one.
+## Bootstrap flow
 
-## Getting your first key
+Three steps, one focus each. The agent drives the flow, the human verifies their email.
 
-Log in at [console.listbee.so](https://console.listbee.so) with your email. An OTP is sent to your inbox. After logging in, your first API key is shown on the dashboard.
-
-## Creating additional keys
+### Step 1: Send OTP
 
 <CodeBlocks>
-  <CodeBlock title="Python">
+<CodeBlock title="Python">
 ```python
 from listbee import ListBee
 
-client = ListBee(api_key="lb_...")
-
-key = client.api_keys.create(name="n8n integration")
-
-print(key.id)     # lbk_7kQ2xY9mN3pR5tW1vB8a
-print(key.key)    # lb_... (shown once — store it now)
+result = ListBee.bootstrap.start(email="seller@example.com")
+session = result.session
+# Ask the human: "Check your email for a 6-digit code"
 ```
-  </CodeBlock>
-  <CodeBlock title="curl">
+</CodeBlock>
+<CodeBlock title="curl">
 ```bash
-curl -X POST https://api.listbee.so/v1/api-keys \
-  -H "Authorization: Bearer lb_..." \
+curl -X POST https://api.listbee.so/v1/bootstrap \
   -H "Content-Type: application/json" \
-  -d '{"name": "n8n integration"}'
+  -d '{"email": "seller@example.com"}'
 ```
-  </CodeBlock>
+</CodeBlock>
 </CodeBlocks>
 
 Response:
 
 ```json
 {
-  "object": "api_key",
-  "id": "lbk_7kQ2xY9mN3pR5tW1vB8a",
-  "name": "n8n integration",
-  "prefix": "lb_7kQ2xY",
-  "key": "lb_7kQ2xY9mN3pR5tW1vB8a01...",
-  "created_at": "2026-04-09T10:00:00Z"
+  "object": "bootstrap_session",
+  "session": "sess_abc123...",
+  "otp_sent": true
 }
 ```
 
-The `key` field contains the full value. This is the only time it is returned.
+### Step 2: Verify OTP
+
+The human reads the 6-digit code from their email. The agent passes it back.
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+result = ListBee.bootstrap.verify(session=session, code="847291")
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/bootstrap/verify \
+  -H "Content-Type: application/json" \
+  -d '{"session": "sess_abc123...", "code": "847291"}'
+```
+</CodeBlock>
+</CodeBlocks>
+
+If the email is new, an account is created. If it already exists, the existing account is used. The agent doesn't know which case occurred.
+
+### Step 3: Create store
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+store = ListBee.bootstrap.create_store(
+    session=session,
+    store_name="SEO Pro"
+)
+api_key = store.api_key  # lb_... — shown once, save it
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/bootstrap/store \
+  -H "Content-Type: application/json" \
+  -d '{"session": "sess_abc123...", "store_name": "SEO Pro"}'
+```
+</CodeBlock>
+</CodeBlocks>
+
+Response:
+
+```json
+{
+  "object": "store",
+  "id": "st_7kQ2xY9mN3pR5tW1vB8a",
+  "api_key": "lb_abc123...",
+  "display_name": "SEO Pro",
+  "slug": "seo-pro",
+  "url": "https://buy.listbee.so/seo-pro",
+  "readiness": {
+    "sellable": false,
+    "actions": [{ "code": "connect_stripe", "kind": "human", "message": "Connect Stripe to accept payments" }],
+    "next": "connect_stripe"
+  }
+}
+```
+
+The `api_key` is returned once. Store it and use it as `Authorization: Bearer lb_...` for all subsequent requests.
 
 ## Using a key
-
-Pass the key in the `Authorization` header on every request:
 
 ```
 Authorization: Bearer lb_...
 ```
 
-Missing or invalid keys return `401`. Using a deleted key returns `401`.
+Each key belongs to one store. All operations through that key are scoped to that store's listings, orders, and webhooks.
 
-## Listing keys
+Missing or invalid keys return `401`.
 
-<CodeBlocks>
-  <CodeBlock title="Python">
-```python
-keys = client.api_keys.list()
+## Same email, second store
 
-for key in keys.data:
-    print(key.id, key.name, key.prefix)
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
-```bash
-curl https://api.listbee.so/v1/api-keys \
-  -H "Authorization: Bearer lb_..."
-```
-  </CodeBlock>
-</CodeBlocks>
+An agent bootstrapping with an email that already has an account creates a new store on that account. If Stripe is already connected, the new store is immediately sellable.
 
-The response includes full key values for all keys. Do not log or transmit this response.
+## Key rotation
 
-## Deleting a key
-
-<CodeBlocks>
-  <CodeBlock title="Python">
-```python
-client.api_keys.delete(key_id="lbk_7kQ2xY9mN3pR5tW1vB8a")
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
-```bash
-curl -X DELETE https://api.listbee.so/v1/api-keys/lbk_7kQ2xY9mN3pR5tW1vB8a \
-  -H "Authorization: Bearer lb_..."
-```
-  </CodeBlock>
-</CodeBlocks>
-
-You cannot delete the key used in the current request. Create and switch to a replacement key first.
-
-## Key fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | API key entity ID (`lbk_` prefixed) |
-| `name` | string | Human-readable label |
-| `prefix` | string | First 8 characters of the key value |
-| `key` | string | Full key value — returned at creation only |
-| `created_at` | string | ISO 8601 timestamp |
+Keys can be rotated in the [console](https://console.listbee.so). The old key is immediately invalidated. The store ID stays the same.
 
 ## Related
 
-- [Quickstart](/docs/quickstart) — end-to-end example using an API key
-- [Readiness](/docs/readiness) — account setup steps before you can sell
+- [Stores](/stores) — how stores work as brand identity and scoping
+- [Quickstart](/quickstart) — bootstrap to first listing in 5 minutes
+- [Readiness](/readiness) — what readiness tells you about store and listing state

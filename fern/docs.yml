@@ -48,6 +48,8 @@ navigation:
         contents:
           - page: Authentication
             path: ./docs/pages/authentication.mdx
+          - page: Stores
+            path: ./docs/pages/stores.mdx
           - page: Listings
             path: ./docs/pages/listings.mdx
           - page: Deliverables

@@ -1,51 +1,69 @@
 ---
 title: Readiness
-subtitle: Actionable setup state on accounts and listings
-covers_endpoints: [get_account, get_listing, get_order]
+subtitle: Structured guidance on accounts, listings, orders, and webhooks
+covers_endpoints: [get_account, get_listing, get_order, list_webhooks]
 ---
 
-The `readiness` object appears on both account and listing responses. It tells you whether the resource is operational and, if not, exactly what to do next. Agents can consume readiness programmatically to drive setup workflows without hardcoding business rules.
+Every resource that has prerequisites — accounts, listings, orders, webhooks — includes a `readiness` object in its API response. Readiness tells you two things: whether the resource is ready to use, and if not, exactly what steps to take next.
 
-## How it works
+Agents consume readiness programmatically to drive setup and fulfillment workflows without hardcoding business rules. When requirements change, the actions list updates automatically — your code doesn't need to.
 
-Every account, listing, and order response includes a `readiness` object. It has three fields:
+## The readiness object
 
-- **`operational`** (account) or **`sellable`** (listing) — `true` when the resource is ready to use.
-- **`actions`** — array of steps to take, each with a code, kind, message, and resolve instructions.
-- **`next`** — the code of the highest-priority action. `null` when ready. API-kind actions take priority over human-kind.
+Each entity uses a domain-specific boolean flag, plus a shared `actions` array and `next` pointer:
 
-When `actions` is empty, the resource is ready. When `actions` is non-empty, work through them in order — each resolved action may unlock the next.
+| Entity | Flag field | Meaning when `true` |
+|--------|-----------|---------------------|
+| Account | `operational` | Can accept payments and sell |
+| Listing | `sellable` | Live and buyable by customers |
+| Order | `fulfilled` | Content delivered to the buyer |
+| Webhook | `ready` | Active and receiving events |
 
-## Action shape
+When the flag is `true`, `actions` is empty and `next` is `null`. When `false`, `actions` lists the concrete steps to get there.
 
 ```json
 {
-  "code": "connect_stripe",
-  "kind": "api",
-  "message": "Connect Stripe account to accept payments.",
-  "resolve": {
-    "method": "POST",
-    "endpoint": "/v1/account/stripe/connect",
-    "url": null,
-    "params": null
+  "readiness": {
+    "sellable": false,
+    "actions": [
+      {
+        "code": "connect_stripe",
+        "kind": "api",
+        "priority": "required",
+        "message": "Connect Stripe account to accept payments.",
+        "resolve": {
+          "method": "POST",
+          "endpoint": "/v1/account/stripe/connect"
+        }
+      }
+    ],
+    "next": "connect_stripe"
   }
 }
 ```
 
+## Action shape
+
+Every action in the `actions` array follows this structure:
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `code` | string | Machine-readable identifier for branching logic |
-| `kind` | string | `api` — agent can call the endpoint directly; `human` — requires browser redirect |
-| `priority` | string | `required` — blocks progress; `suggested` — available opportunity |
-| `message` | string | Human-readable explanation; safe to relay to users |
-| `resolve.method` | string | HTTP method, or `redirect` for human actions |
-| `resolve.endpoint` | string | API path for `kind: api` actions |
-| `resolve.url` | string | Full URL for `kind: human` actions |
-| `resolve.params` | object | Example request body for API actions |
+| `code` | string | Stable machine identifier for branching logic (e.g. `connect_stripe`) |
+| `kind` | string | `api` — agent can call the endpoint directly. `human` — requires a browser redirect. |
+| `priority` | string | `required` — blocks progress. `suggested` — available but optional. |
+| `message` | string | Human-readable explanation. Safe to relay to users. |
+| `resolve.method` | string | HTTP method (`POST`, `PATCH`, `PUT`), or `redirect` for human actions |
+| `resolve.endpoint` | string \| null | API path for `kind: api` actions |
+| `resolve.url` | string \| null | Full URL for `kind: human` actions (browser redirect target) |
+| `resolve.params` | object \| null | Example request body for API actions |
+
+The `next` field on the readiness object points to the single highest-priority action code. When there's one clear next step, `next` helps agents avoid scanning the array. When multiple actions are equally valid, `next` is `null` — iterate `actions` instead.
 
 ## Account readiness
 
-`GET /v1/account` returns `readiness.operational`. An account is operational when Stripe is connected, charges are enabled, and billing is current.
+`GET /v1/account` → `readiness.operational`
+
+An account is operational when Stripe is connected, charges are enabled, and billing is current. These are the prerequisites for selling anything.
 
 <CodeBlocks>
   <CodeBlock title="Python">
@@ -53,18 +71,18 @@ When `actions` is empty, the resource is ready. When `actions` is non-empty, wor
 from listbee import ListBee
 
 client = ListBee(api_key="lb_...")
-
 account = client.account.get()
 
-if not account.readiness.operational:
-    next_action = account.readiness.next
-    actions = {a.code: a for a in account.readiness.actions}
-
-    action = actions[next_action]
-    print(f"Next step: {action.message}")
-    # next_action == "connect_stripe" → call POST /v1/account/stripe/connect
-    # next_action == "enable_charges" → redirect human to Stripe onboarding
-    # next_action == "update_billing" → redirect human to billing page
+if account.readiness.operational:
+    print("Account is ready to sell")
+else:
+    for action in account.readiness.actions:
+        if action.kind == "api":
+            print(f"Agent step: {action.resolve.method} {action.resolve.endpoint}")
+            print(f"  → {action.message}")
+        else:
+            print(f"Human step: {action.message}")
+            print(f"  → {action.resolve.url}")
 ```
   </CodeBlock>
   <CodeBlock title="curl">
@@ -75,7 +93,7 @@ curl https://api.listbee.so/v1/account \
   </CodeBlock>
 </CodeBlocks>
 
-Account readiness response (not yet operational):
+Example response — account not yet operational:
 
 ```json
 {
@@ -87,12 +105,11 @@ Account readiness response (not yet operational):
       {
         "code": "connect_stripe",
         "kind": "api",
+        "priority": "required",
         "message": "Connect Stripe account to accept payments.",
         "resolve": {
           "method": "POST",
-          "endpoint": "/v1/account/stripe/connect",
-          "url": null,
-          "params": null
+          "endpoint": "/v1/account/stripe/connect"
         }
       }
     ],
@@ -103,20 +120,23 @@ Account readiness response (not yet operational):
 
 ## Listing readiness
 
-`GET /v1/listings/{id}` returns `readiness.sellable`. A listing is sellable when the account is operational and all listing-specific requirements are met.
+`GET /v1/listings/{id}` → `readiness.sellable`
+
+A listing is sellable when the owning account is operational and all listing-specific requirements are met. Draft listings are never sellable — they must be published first.
+
+Listing readiness checks are cumulative: Stripe must be connected, billing must be current, a fulfillment path must exist (deliverables, webhook, or `fulfillment_url`), and the listing must be published. The `actions` array reflects whatever is still missing.
 
 <CodeBlocks>
   <CodeBlock title="Python">
 ```python
 listing = client.listings.get(listing_id="lst_7kQ2xY9mN3pR5tW1vB8a")
 
-if not listing.readiness.sellable:
+if listing.readiness.sellable:
+    print(f"Live at {listing.url}")
+else:
+    print(f"{len(listing.readiness.actions)} steps remaining:")
     for action in listing.readiness.actions:
-        print(f"{action.code} ({action.kind}): {action.message}")
-        if action.kind == "api":
-            print(f"  → {action.resolve.method} {action.resolve.endpoint}")
-        else:
-            print(f"  → redirect to {action.resolve.url}")
+        print(f"  [{action.priority}] {action.code}: {action.message}")
 ```
   </CodeBlock>
   <CodeBlock title="curl">
@@ -127,11 +147,13 @@ curl https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a \
   </CodeBlock>
 </CodeBlocks>
 
+`publish_listing` always appears last in the actions list, only after all other blockers are cleared. This means an agent can resolve each action in order and re-fetch — the list converges to `sellable: true`.
+
 ## Order readiness
 
-`GET /v1/orders/{id}` and order list responses include `readiness.fulfilled`. An order is fulfilled when content has been delivered to the buyer.
+`GET /v1/orders/{id}` → `readiness.fulfilled`
 
-`paid` orders that are not yet fulfilled include a `fulfill_order` action — your agent can push content via `POST /v1/orders/{id}/fulfill`.
+An order is fulfilled when content has been delivered to the buyer. Orders where the listing had deliverables are auto-fulfilled at payment time. Orders without deliverables stay in `paid` status until your agent calls `/fulfill` or handles delivery externally.
 
 ```json
 {
@@ -157,50 +179,160 @@ curl https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a \
 }
 ```
 
-`fulfill_order` uses `priority: suggested` rather than `required` — delivery via ListBee is optional. Sellers can handle delivery externally.
+`fulfill_order` uses `priority: suggested` because delivery via ListBee is optional — sellers can handle delivery externally. `next` is `null` because suggested actions don't auto-promote to `next`.
 
-## Common action codes
+## Webhook readiness
 
-| Code | Kind | When it appears | Resolution |
-|------|------|----------------|------------|
-| `connect_stripe` | `api` | No Stripe account connected | `POST /v1/account/stripe/connect` — returns onboarding URL |
-| `enable_charges` | `human` | Stripe connected but onboarding incomplete | Redirect to Stripe onboarding via console |
-| `update_billing` | `human` | Billing past due or unpaid | Redirect to billing page in console |
-| `configure_fulfillment` | `api` | External listing has no fulfillment path (no deliverables, no webhook, no fulfillment_url) | `PATCH /v1/listings/{id}` with `fulfillment_url` |
-| `publish_listing` | `api` | All other blockers cleared; listing still in draft | `POST /v1/listings/{id}/publish` |
-| `webhook_disabled` | `api` | Webhook was auto-disabled after consecutive failures | Re-enable or replace the webhook |
-| `fulfill_order` | `api` | PAID order not yet fulfilled | `POST /v1/orders/{id}/fulfill` |
+`GET /v1/webhooks` → each webhook has `readiness.ready`
 
-## Walking an agent through setup
+A webhook is ready when it is enabled and receiving events. If a webhook was auto-disabled after consecutive delivery failures, a `webhook_disabled` action tells the agent to re-enable it.
 
-Because `kind` tells you whether a step is automated or human-gated, agents can handle setup end-to-end up to the first human step:
-
-```python
-account = client.account.get()
-
-for action in account.readiness.actions:
-    if action.kind == "api":
-        # Agent executes directly
-        print(f"Calling {action.resolve.method} {action.resolve.endpoint}")
-    else:
-        # Hand off to human
-        print(f"Human action required: {action.message}")
-        print(f"URL: {action.resolve.url}")
-        break
+```json
+{
+  "object": "webhook",
+  "id": "wh_3mK8nP2qR5tW7xY1",
+  "enabled": false,
+  "disabled_reason": "consecutive_failures",
+  "readiness": {
+    "ready": false,
+    "actions": [
+      {
+        "code": "webhook_disabled",
+        "kind": "api",
+        "priority": "required",
+        "message": "Webhook was auto-disabled after 3 consecutive delivery failures. Re-enable it and retry failed events.",
+        "resolve": {
+          "method": "PUT",
+          "endpoint": "/v1/webhooks/wh_3mK8nP2qR5tW7xY1",
+          "params": { "enabled": true }
+        }
+      }
+    ],
+    "next": "webhook_disabled"
+  }
+}
 ```
 
-`publish_listing` always appears last in the actions list, only when all other blockers are cleared. This pattern — resolve each action and re-fetch — converges to `sellable: true`.
+## Action codes reference
+
+| Code | Kind | Priority | When it appears | How to resolve |
+|------|------|----------|----------------|----------------|
+| `connect_stripe` | `api` | `required` | No Stripe account connected | `POST /v1/account/stripe/connect` |
+| `enable_charges` | `human` | `required` | Stripe connected but onboarding incomplete | Redirect to console settings |
+| `update_billing` | `human` | `required` | Billing past due or unpaid | Redirect to console billing |
+| `configure_fulfillment` | `api` | `required` | External listing with no fulfillment path | `PATCH /v1/listings/{id}` with `fulfillment_url`, or create a webhook for `order.paid` |
+| `publish_listing` | `api` | `required` | All blockers cleared, listing still in draft | `POST /v1/listings/{id}/publish` |
+| `webhook_disabled` | `api` | `required` | Webhook auto-disabled after delivery failures | `PUT /v1/webhooks/{id}` with `enabled: true` |
+| `fulfill_order` | `api` | `suggested` | Paid order not yet fulfilled | `POST /v1/orders/{id}/fulfill` |
+
+## Driving setup with an agent
+
+Because `kind` distinguishes between agent-executable steps and human-gated steps, an agent can automate setup end-to-end — stopping only when a human action is required:
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+# Resolve account readiness
+account = client.account.get()
+while not account.readiness.operational:
+    action = next(
+        (a for a in account.readiness.actions if a.kind == "api"),
+        None,
+    )
+    if action is None:
+        # Remaining actions require a human
+        human_action = account.readiness.actions[0]
+        print(f"Human step needed: {human_action.message}")
+        print(f"URL: {human_action.resolve.url}")
+        break
+
+    print(f"Executing: {action.resolve.method} {action.resolve.endpoint}")
+    # ... call the endpoint ...
+    account = client.account.get()  # re-fetch to see updated readiness
+
+# Then resolve listing readiness
+listing = client.listings.create(name="My Product", price=2900)
+listing = client.listings.get(listing_id=listing.id)
+
+while not listing.readiness.sellable:
+    action = next(
+        (a for a in listing.readiness.actions if a.kind == "api"),
+        None,
+    )
+    if action is None:
+        break
+    print(f"Executing: {action.resolve.method} {action.resolve.endpoint}")
+    # ... call the endpoint ...
+    listing = client.listings.get(listing_id=listing.id)
+
+if listing.readiness.sellable:
+    print(f"Live at {listing.url}")
+```
+  </CodeBlock>
+  <CodeBlock title="TypeScript">
+```typescript
+import { ListBee } from 'listbee';
+
+const client = new ListBee({ apiKey: 'lb_...' });
+
+// Resolve account readiness
+let account = await client.account.get();
+while (!account.readiness.operational) {
+  const apiAction = account.readiness.actions.find(a => a.kind === 'api');
+  if (!apiAction) {
+    const humanAction = account.readiness.actions[0];
+    console.log(`Human step: ${humanAction.message}`);
+    console.log(`URL: ${humanAction.resolve.url}`);
+    break;
+  }
+  console.log(`Executing: ${apiAction.resolve.method} ${apiAction.resolve.endpoint}`);
+  // ... call the endpoint ...
+  account = await client.account.get();
+}
+```
+  </CodeBlock>
+</CodeBlocks>
+
+The pattern is always the same: fetch → check flag → execute next `api` action → re-fetch. This loop converges because each resolved action removes itself from the list.
 
 ## Readiness and errors
 
-When an operation fails because of unmet readiness (e.g. publishing an incomplete listing), the error response mirrors the readiness structure. The `publish_failed` error includes the same `actions` and `next` fields — your agent doesn't need to make a follow-up GET to discover what's wrong.
+Readiness is proactive guidance — check before acting. But when an operation fails because of unmet readiness, the error response carries the same structured guidance.
 
-See [Errors](/errors#extension-members) for the full list of enriched error codes.
+The `publish_failed` error includes the full `actions` array and `next` pointer — identical to what you'd get from `GET /v1/listings/{id}`. Your agent doesn't need a follow-up request to discover what went wrong:
+
+```json
+{
+  "type": "https://docs.listbee.so/errors/publish-failed",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Listing cannot be published: missing payment configuration",
+  "code": "publish_failed",
+  "actions": [
+    {
+      "code": "connect_stripe",
+      "kind": "api",
+      "priority": "required",
+      "message": "Connect Stripe account to accept payments.",
+      "resolve": { "method": "POST", "endpoint": "/v1/account/stripe/connect" }
+    }
+  ],
+  "next": "connect_stripe"
+}
+```
+
+Whether your agent checks readiness first or just tries and fails, it gets the same structured answer.
+
+See [Errors](/errors#extension-members) for the full list of error codes with structured metadata.
 
 ## Related
 
-- [Authentication](/docs/authentication) — getting an API key before setup begins
-- [Listings](/docs/listings) — listing state and the publish step
-- [Webhooks](/docs/webhooks) — configuring webhooks to clear `configure_fulfillment` actions
 - [Errors](/errors) — how failed operations echo readiness guidance
-- [Orders](/orders) — order readiness and the fulfill workflow
+- [Orders](/orders) — order lifecycle and the fulfill endpoint
+- [Fulfillment](/fulfillment) — managed vs. external delivery
+- [Webhooks](/webhooks) — configuring webhooks for `order.paid` events
+- [Authentication](/authentication) — getting an API key before setup begins

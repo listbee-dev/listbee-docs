@@ -50,6 +50,8 @@ navigation:
             path: ./docs/pages/authentication.mdx
           - page: Listings
             path: ./docs/pages/listings.mdx
+          - page: Deliverables
+            path: ./docs/pages/deliverables.mdx
           - page: Orders
             path: ./docs/pages/orders.mdx
           - page: Fulfillment

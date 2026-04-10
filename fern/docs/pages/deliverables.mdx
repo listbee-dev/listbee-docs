@@ -1,0 +1,166 @@
+---
+title: Deliverables
+subtitle: The content buyers receive after payment — files, URLs, or text
+covers_endpoints: [set_deliverables, add_deliverable, remove_deliverables, upload_file, fulfill_order]
+---
+
+A deliverable is the thing being sold. An ebook PDF, a download link, a license key, a generated report. Every purchase on ListBee ends with the buyer receiving one or more deliverables.
+
+Deliverables can be attached to a listing before publishing (for instant delivery on payment) or pushed to an order via `/fulfill` after payment (for generated content). Up to 3 per listing or per `/fulfill` call. Mixed types allowed.
+
+## Types
+
+Three types, each covering a different hosting model:
+
+| Type | Input | What buyer sees | Who hosts | Limits |
+|------|-------|----------------|-----------|--------|
+| `file` | `token` from `POST /v1/files` | Signed download link | ListBee (Bunny CDN) | 25 MB per file |
+| `url` | `value` — any URL | Redirect to your URL | You | No size limit |
+| `text` | `value` — literal string | Text on the download page | ListBee renders it | 10,000 chars |
+
+**File** — ListBee hosts the file on Bunny CDN. Upload via `POST /v1/files`, get a token, reference the token when attaching deliverables. After payment, the buyer gets a signed download URL that expires in minutes. Supported formats: PDF, EPUB, ZIP, images (PNG, JPEG, GIF, WebP, SVG), audio (MP3, WAV, FLAC, AAC, OGG), video (MP4, WebM, MOV), and Office documents (DOCX, XLSX, PPTX).
+
+**URL** — You host the content. ListBee redirects the buyer to your URL on the download page. Use for content already on S3, Google Drive, Notion, or any link you control. ListBee does not validate or cache the URL — if it goes down, the buyer sees a broken link. You are responsible for access control on the destination.
+
+**Text** — ListBee renders the string directly on the download page. Use for license keys, access codes, passwords, short instructions, or AI-generated content. Newlines are preserved. No markdown rendering.
+
+## Uploading files
+
+File deliverables require a two-step flow: upload the file, then reference the returned token.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+from listbee import ListBee
+
+client = ListBee(api_key="lb_...")
+
+# Step 1: Upload the file — returns a token valid for 24 hours
+file = client.files.upload(open("ebook.pdf", "rb"))
+print(file.id)  # file_7kQ2xY9mN3pR5tW1vB8a01
+
+# Step 2: Use the token in set_deliverables or /fulfill
+client.listings.set_deliverables(
+    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
+    deliverables=[{"type": "file", "token": file.id}],
+)
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+# Step 1: Upload
+curl -X POST https://api.listbee.so/v1/files \
+  -H "Authorization: Bearer lb_..." \
+  -F "file=@ebook.pdf"
+# Returns: {"object": "file", "id": "file_7kQ2xY9mN3pR5tW1vB8a01", ...}
+
+# Step 2: Attach to listing
+curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"deliverables": [{"type": "file", "token": "file_7kQ2xY9mN3pR5tW1vB8a01"}]}'
+```
+  </CodeBlock>
+</CodeBlocks>
+
+File tokens expire after 24 hours. If a token expires before you attach it, upload the file again. Once attached, the file is permanent — the token expiry no longer applies.
+
+Files are stored on Bunny CDN. Buyers never see the raw CDN path. Tokens are references, not content — the same token works in both `set_deliverables` and `/fulfill`.
+
+## Attaching to a listing
+
+`set_deliverables` replaces all deliverables on the listing. `add_deliverable` appends a single deliverable. `remove_deliverables` clears all deliverables.
+
+Any draft listing can have deliverables. If a listing has deliverables when a buyer pays, ListBee auto-delivers — no webhook or agent code needed.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+```python
+# Replace all deliverables (mixed types)
+client.listings.set_deliverables(
+    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
+    deliverables=[
+        {"type": "file", "token": "file_7kQ2xY9mN3pR5tW1vB8a01"},
+        {"type": "url", "value": "https://community.example.com/invite/abc"},
+        {"type": "text", "value": "Your license key: ABC-123-XYZ"},
+    ],
+)
+
+# Append one deliverable
+client.listings.add_deliverable(
+    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
+    type="url",
+    value="https://example.com/bonus-content",
+)
+
+# Clear all deliverables
+client.listings.remove_deliverables(listing_id="lst_7kQ2xY9mN3pR5tW1vB8a")
+```
+  </CodeBlock>
+  <CodeBlock title="curl">
+```bash
+# Replace all deliverables (mixed types)
+curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deliverables": [
+      {"type": "file", "token": "file_7kQ2xY9mN3pR5tW1vB8a01"},
+      {"type": "url", "value": "https://community.example.com/invite/abc"},
+      {"type": "text", "value": "Your license key: ABC-123-XYZ"}
+    ]
+  }'
+
+# Clear all deliverables
+curl -X DELETE https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
+  -H "Authorization: Bearer lb_..."
+```
+  </CodeBlock>
+</CodeBlocks>
+
+The buyer sees all deliverables on their download page — files as download buttons, URLs as links, text as rendered content.
+
+## Pushing to an order
+
+The same deliverable types work in `POST /v1/orders/{id}/fulfill`. After payment, your agent can push deliverables to any `paid` order. ListBee creates an access grant, emails the buyer, and marks the order `fulfilled`.
+
+```python
+client.orders.fulfill(
+    order_id="ord_9xM4kP7nR2qT5wY1",
+    deliverables=[
+        {"type": "text", "value": "Your personalized report: ..."},
+    ],
+)
+```
+
+For the full `/fulfill` flow, including `fulfillment_url` callbacks and the stateless agent pattern, see [Fulfillment](/docs/fulfillment).
+
+## Delivery security
+
+Buyers never access files directly. Every purchase creates an **access grant** — a short-lived, tokenized download session:
+
+- **Token-based access** — buyers receive a unique URL like `buy.listbee.so/{slug}?token=abc...`. The token is a 32-character random string, not guessable.
+- **Expiry** — 72 hours from payment, or 10 page views, whichever comes first. After expiry, the download page returns 404.
+- **Signed CDN URLs** — file deliverables are served through signed URLs generated on each page view. The signed URL expires in minutes, preventing link sharing.
+- **Per-order isolation** — each order gets its own access grant. Revoking or refunding one order does not affect another buyer's access.
+- **URL deliverables are not protected** — ListBee redirects to your URL as-is. If you need access control on the destination, handle it on your end (signed URLs, auth tokens, etc.).
+- **Text deliverables are rendered server-side** — visible only through the access grant token. Not indexed by search engines.
+
+## Limits
+
+| Limit | Value |
+|-------|-------|
+| Max deliverables per listing | 3 |
+| Max deliverables per `/fulfill` call | 3 |
+| Max file size | 25 MB |
+| File token validity | 24 hours |
+| Access grant expiry | 72 hours |
+| Access grant page views | 10 |
+| Text max length | 10,000 characters |
+
+## Related
+
+- [Listings](/docs/listings) — creating listings and attaching deliverables
+- [Fulfillment](/docs/fulfillment) — how deliverables determine delivery behavior
+- [Orders](/docs/orders) — order status lifecycle and the `/fulfill` endpoint
+- [Entity model](/docs/entity-model) — deliverable types in the data model

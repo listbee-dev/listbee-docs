@@ -83,15 +83,7 @@ curl -X POST https://api.listbee.so/v1/listings \
 
 ## Attaching deliverables
 
-Attach deliverables to any draft listing. Buyers receive these automatically after payment — no webhook or agent code needed.
-
-| Type | Field | Example use |
-|------|-------|------------|
-| `file` | `token` from `POST /v1/files` | PDFs, ZIPs, images — hosted by ListBee |
-| `url` | `value` — any URL | External downloads, Notion pages, Google Drive links |
-| `text` | `value` — literal string | License keys, passwords, short instructions |
-
-Up to 3 deliverables per listing. Mixed types allowed. For the full reference on file uploads, limits, and mixing — see [Deliverable types](/fulfillment#deliverable-types).
+Attach content that buyers receive after payment. Any draft listing can have deliverables. If deliverables are attached, ListBee auto-delivers on payment.
 
 <CodeBlocks>
   <CodeBlock title="Python">
@@ -102,41 +94,19 @@ client.listings.set_deliverables(
     listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
     deliverables=[{"type": "file", "token": file.id}],
 )
-
-# URL: direct redirect after payment
-client.listings.set_deliverables(
-    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
-    deliverables=[{"type": "url", "value": "https://example.com/download/seo-playbook"}],
-)
-
-# Text: rendered on the download page
-client.listings.set_deliverables(
-    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
-    deliverables=[{"type": "text", "value": "Your license key: ABC-123-XYZ"}],
-)
 ```
   </CodeBlock>
   <CodeBlock title="curl">
 ```bash
-# File: upload, then attach
-curl -X POST https://api.listbee.so/v1/files \
-  -H "Authorization: Bearer lb_..." \
-  -F "file=@ebook.pdf"
-# Returns: {"id": "file_7kQ2xY9mN3pR5tW1vB8a01", ...}
-
 curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
   -H "Authorization: Bearer lb_..." \
   -H "Content-Type: application/json" \
   -d '{"deliverables": [{"type": "file", "token": "file_7kQ2xY9mN3pR5tW1vB8a01"}]}'
-
-# URL: direct redirect
-curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
-  -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{"deliverables": [{"type": "url", "value": "https://example.com/download/seo-playbook"}]}'
 ```
   </CodeBlock>
 </CodeBlocks>
+
+Three types: `file` (uploaded via `POST /v1/files`), `url` (redirect), and `text` (literal string). For the full reference on types, hosting, file uploads, and security — see [Deliverables](/docs/deliverables).
 
 ## Publishing
 
@@ -239,6 +209,7 @@ Published listings cannot be unpublished. Delete and recreate if needed.
 
 ## Related
 
+- [Deliverables](/docs/deliverables) — types, file uploads, security, and limits
 - [Fulfillment](/docs/fulfillment) — how deliverables determine delivery behavior
 - [Readiness](/docs/readiness) — how to interpret and resolve readiness actions
 - [Orders](/docs/orders) — what happens after a buyer pays

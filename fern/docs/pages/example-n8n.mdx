@@ -26,7 +26,6 @@ Add a **ListBee** node:
 - **Operation:** Create
 - **Name:** `Weekly Report Template`
 - **Price:** `4900` (cents — $49.00)
-- **Content type:** `static`
 - **Description:** `A plug-and-play template for weekly business reviews.`
 
 The node outputs the listing object. Use `{{ $json.id }}` to reference the listing ID in downstream nodes.
@@ -40,7 +39,6 @@ curl -X POST https://api.listbee.so/v1/listings \
   -d '{
     "name": "Weekly Report Template",
     "price": 4900,
-    "content_type": "static",
     "description": "A plug-and-play template for weekly business reviews."
   }'
 ```
@@ -130,7 +128,7 @@ Use `$json.payload.buyer_email`, `$json.payload.amount`, and `$json.payload.list
 {{ $json.payload.listing_snapshot.id === 'lst_abc123' }}
 ```
 
-**Fulfill generated content** — if `content_type` is `generated`, call the **ListBee** node with **Operation: Fulfill** after generating content, passing `order_id` and the content to deliver.
+**Fulfill generated content** — for listings without deliverables, use the **ListBee** node with **Operation: Fulfill** after generating content, passing `order_id` and the content to deliver.
 
 **Write to a spreadsheet** — replace the Slack node with a **Google Sheets** node to log every order to a sheet.
 

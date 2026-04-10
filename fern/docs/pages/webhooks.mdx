@@ -79,8 +79,10 @@ Passing an empty `events` array subscribes to all events.
     "amount": 1900,
     "currency": "USD",
     "status": "paid",
-    "content_type": "generated",
+    "has_deliverables": false,
+    "listing_metadata": {},
     "checkout_data": {"note": "Gift wrap please"},
+    "fulfill_url": "/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill",
     "paid_at": "2026-04-09T14:30:00Z"
   }
 }
@@ -119,7 +121,7 @@ Always verify signatures before processing. Reject requests with invalid or miss
 | Event | When it fires |
 |-------|--------------|
 | `order.paid` | Stripe confirmed payment |
-| `order.fulfilled` | Content delivered to buyer (static and generated listings) |
+| `order.fulfilled` | Content delivered to buyer |
 | `order.refunded` | Full refund processed |
 | `order.disputed` | Buyer opened a Stripe dispute |
 | `order.dispute_closed` | Dispute resolved |

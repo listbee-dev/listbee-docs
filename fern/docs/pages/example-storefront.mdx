@@ -40,7 +40,6 @@ for item in catalogue:
     listing = client.listings.create(
         name=item["name"],
         price=item["price"],           # cents
-        content_type="static",
         description=item.get("description"),
     )
 

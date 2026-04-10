@@ -4,31 +4,37 @@ subtitle: How ListBee delivers content to buyers after payment
 covers_endpoints: [create_listing, set_deliverables, fulfill_order]
 ---
 
-Fulfillment is what happens after a buyer pays. The behavior is determined by the listing's `content_type`, set at creation and locked on publish. There are three modes: ListBee delivers pre-attached content automatically (`static`), your agent pushes generated content (`generated`), or your external system takes over entirely (`webhook`).
+Fulfillment is what happens after a buyer pays. The behavior is derived from whether the listing has deliverables attached — no explicit mode to configure.
 
 ## How it works
 
-When Stripe confirms payment, ListBee inspects the order's `content_type` and takes the appropriate action:
+When Stripe confirms payment, ListBee inspects the order and takes the appropriate action:
 
-- **static** — ListBee immediately creates an access grant from the listing's pre-attached deliverables, emails the buyer a download link, and marks the order `fulfilled`. No action required from you.
-- **generated** — the order transitions to `processing` and ListBee fires `order.paid`. Your agent receives the event, generates the content, then calls `POST /v1/orders/{id}/fulfill` to push it. ListBee delivers it and marks the order `fulfilled`.
-- **webhook** — ListBee fires `order.paid` and marks the order `handed_off`. Your system is fully responsible for delivery. ListBee does not deliver anything.
+- **Has deliverables** — ListBee immediately creates an access grant, emails the buyer a download link, and marks the order `fulfilled`. No action required from you.
+- **No deliverables** — ListBee fires `order.paid` to your configured webhook. Your system handles delivery. Optionally, your agent can call `POST /v1/orders/{id}/fulfill` to push content back to ListBee for delivery.
 
-`order.fulfilled` fires for `static` and `generated` orders. `order.paid` fires for all three.
+`order.fulfilled` fires when an order reaches the `fulfilled` state. `order.paid` fires for every order.
 
-## Choosing a content type
+## The `fulfillment_url` callback
 
-| | `static` | `generated` | `webhook` |
-|---|---|---|---|
-| Who delivers | ListBee | ListBee (after agent pushes) | Your system |
-| Deliverables on listing | Required | Not allowed | Not allowed |
-| Webhook required | No | Yes (`order.paid`) | Yes (`order.paid`) |
-| Order terminal state | `fulfilled` | `fulfilled` | `handed_off` |
-| Use when | Fixed files, URLs, text | AI-generated content, per-order reports | Physical goods, services, SaaS access |
+Set `fulfillment_url` on a listing to receive a POST request from ListBee when each order is paid. This is a per-listing callback — separate from your account-level webhooks.
 
-## Static delivery
+The payload includes enriched metadata so your agent can act without any lookups:
 
-Attach up to 3 deliverables to the listing before publishing. On payment, ListBee delivers them automatically.
+```json
+{
+  "order_id": "ord_9xM4kP7nR2qT5wY1",
+  "listing_id": "lst_7kQ2xY9mN3pR5tW1vB8a",
+  "buyer_email": "buyer@example.com",
+  "amount": 4900,
+  "has_deliverables": false,
+  "listing_metadata": {"product_tier": "pro", "template_id": "rpt-42"},
+  "checkout_data": {"company": "Acme Corp", "use_case": "quarterly review"},
+  "fulfill_url": "https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill"
+}
+```
+
+`fulfill_url` is the endpoint your agent calls to push generated content back. `fulfillment_url` is where ListBee calls your agent — they are distinct.
 
 <CodeBlocks>
   <CodeBlock title="Python">
@@ -37,80 +43,51 @@ from listbee import ListBee
 
 client = ListBee(api_key="lb_...")
 
-# 1. Create a static listing
 listing = client.listings.create(
-    name="Python Crash Course",
-    price=2900,
-    content_type="static",
+    name="Personalized Investment Report",
+    price=4900,
+    fulfillment_url="https://your-agent.example.com/hooks/listbee",
+    metadata={"product_tier": "pro", "template_id": "rpt-42"},
 )
 
-# 2. Attach content (file, url, or text — up to 3)
-client.listings.set_deliverables(
-    listing_id=listing.id,
-    deliverables=[
-        {"type": "url", "value": "https://cdn.example.com/python-course.pdf"},
-    ],
-)
-
-# 3. Publish — buyers can now pay and receive the PDF automatically
 client.listings.publish(listing_id=listing.id)
 ```
   </CodeBlock>
   <CodeBlock title="curl">
 ```bash
-# Create listing
 curl -X POST https://api.listbee.so/v1/listings \
   -H "Authorization: Bearer lb_..." \
   -H "Content-Type: application/json" \
-  -d '{"name": "Python Crash Course", "price": 2900, "content_type": "static"}'
-
-# Attach deliverable
-curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
-  -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{"deliverables": [{"type": "url", "value": "https://cdn.example.com/python-course.pdf"}]}'
-
-# Publish
-curl -X POST https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/publish \
-  -H "Authorization: Bearer lb_..."
+  -d '{
+    "name": "Personalized Investment Report",
+    "price": 4900,
+    "fulfillment_url": "https://your-agent.example.com/hooks/listbee",
+    "metadata": {"product_tier": "pro", "template_id": "rpt-42"}
+  }'
 ```
   </CodeBlock>
 </CodeBlocks>
 
-## Generated delivery
+## The `/fulfill` endpoint
 
-Your agent generates content per order in response to `order.paid`, then calls `fulfill` to push it back.
+Call `POST /v1/orders/{id}/fulfill` to push deliverables to ListBee for any `paid` order. ListBee creates an access grant, emails the buyer, and marks the order `fulfilled`.
+
+Works on any PAID order regardless of whether the listing has deliverables. Idempotent — calling it on an already-`fulfilled` order is a no-op.
 
 <CodeBlocks>
   <CodeBlock title="Python">
 ```python
-# 1. Create a generated listing (no deliverables needed)
-listing = client.listings.create(
-    name="Personalized Investment Report",
-    price=4900,
-    content_type="generated",
+# In your webhook or fulfillment_url handler:
+client.orders.fulfill(
+    order_id="ord_9xM4kP7nR2qT5wY1",
+    deliverables=[
+        {"type": "text", "value": "Your personalized investment report: ..."},
+    ],
 )
-
-# Publish (requires an active order.paid webhook first — see readiness)
-client.listings.publish(listing_id=listing.id)
-
-# 2. In your webhook handler — called when order.paid fires:
-def handle_order_paid(order_id: str, checkout_data: dict):
-    # Generate content for this buyer
-    report = generate_report(checkout_data)
-
-    # Push it to ListBee — buyer receives email with download link
-    client.orders.fulfill(
-        order_id=order_id,
-        deliverables=[
-            {"type": "text", "value": report},
-        ],
-    )
 ```
   </CodeBlock>
   <CodeBlock title="curl">
 ```bash
-# Push generated content to an order
 curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill \
   -H "Authorization: Bearer lb_..." \
   -H "Content-Type: application/json" \
@@ -119,38 +96,6 @@ curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill \
       {"type": "text", "value": "Your personalized investment report: ..."}
     ]
   }'
-```
-  </CodeBlock>
-</CodeBlocks>
-
-## Webhook (external) delivery
-
-ListBee fires `order.paid` and hands off. Your system handles all delivery.
-
-<CodeBlocks>
-  <CodeBlock title="Python">
-```python
-# 1. Create a webhook listing
-listing = client.listings.create(
-    name="Premium Membership",
-    price=9900,
-    content_type="webhook",
-)
-
-client.listings.publish(listing_id=listing.id)
-
-# 2. Your endpoint receives order.paid and handles delivery:
-#    - Provision membership access
-#    - Send welcome email
-#    - Any delivery mechanism you control
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
-```bash
-curl -X POST https://api.listbee.so/v1/listings \
-  -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Premium Membership", "price": 9900, "content_type": "webhook"}'
 ```
   </CodeBlock>
 </CodeBlocks>
@@ -210,7 +155,7 @@ Direct redirect — the buyer clicks the download link and is sent to your URL. 
 {"type": "url", "value": "https://cdn.example.com/guide.pdf"}
 ```
 
-Use this for content already hosted elsewhere (S3, Google Drive shared links, Notion pages, Gumroad-style external downloads).
+Use this for content already hosted elsewhere (S3, Google Drive shared links, Notion pages).
 
 ### Text deliverable
 
@@ -236,9 +181,36 @@ A single listing can combine all three:
 
 The buyer sees all three on their download page after payment.
 
+## The stateless agent pattern
+
+`fulfillment_url` and `metadata` together enable a stateless agent: embed everything the agent needs to generate content at the time you create the listing. When `order.paid` fires, the enriched payload carries it all — no database lookups, no state management.
+
+```python
+# At listing creation time — embed generation parameters in metadata
+listing = client.listings.create(
+    name="Custom Market Analysis",
+    price=9900,
+    fulfillment_url="https://your-agent.example.com/generate",
+    metadata={
+        "report_type": "market_analysis",
+        "data_sources": ["bloomberg", "sec_filings"],
+        "output_format": "pdf",
+    },
+)
+
+# At fulfillment time — your agent receives everything it needs in the payload:
+# {
+#   "listing_metadata": {"report_type": "market_analysis", ...},
+#   "checkout_data": {"ticker": "AAPL", "period": "Q1 2026"},
+#   "fulfill_url": "https://api.listbee.so/v1/orders/ord_.../fulfill"
+# }
+#
+# Generate → POST to fulfill_url → done. No state stored on your side.
+```
+
 ## Related
 
-- [Listings](/docs/listings) — setting content type and attaching deliverables
-- [Orders](/docs/orders) — order status lifecycle per content type
+- [Listings](/docs/listings) — attaching deliverables and setting `fulfillment_url`
+- [Orders](/docs/orders) — order status lifecycle
 - [Webhooks](/docs/webhooks) — receiving `order.paid` to trigger fulfillment
-- [Readiness](/docs/readiness) — pre-publish checks for `generated` and `webhook` listings
+- [Readiness](/docs/readiness) — pre-publish checks for listings without deliverables

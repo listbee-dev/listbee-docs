@@ -36,7 +36,6 @@ client = ListBee(api_key="lb_...")
 listing = client.listings.create(
     name="Python Fundamentals",
     price=2900,           # $29.00
-    content_type="static",
 )
 
 print(listing.id)     # lst_abc123...
@@ -92,7 +91,6 @@ const client = new ListBee({ apiKey: 'lb_...' });
 const listing = await client.listings.create({
   name: 'TypeScript Handbook',
   price: 1900,           // $19.00
-  content_type: 'static',
 });
 
 console.log(listing.id);    // lst_abc123...
@@ -129,7 +127,7 @@ All SDK methods map 1:1 to REST endpoints. Any example can be run with curl:
 curl -X POST https://api.listbee.so/v1/listings \
   -H "Authorization: Bearer lb_..." \
   -H "Content-Type: application/json" \
-  -d '{"name": "Python Fundamentals", "price": 2900, "content_type": "static"}'
+  -d '{"name": "Python Fundamentals", "price": 2900}'
 
 # List orders
 curl https://api.listbee.so/v1/orders \

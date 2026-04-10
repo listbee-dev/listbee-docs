@@ -30,6 +30,63 @@ All error responses use [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 
 Use `code` for programmatic branching — `title` and `detail` may change, `code` does not.
 
+## Extension members
+
+Some errors include additional structured fields beyond the standard six. These are [RFC 9457 extension members](https://www.rfc-editor.org/rfc/rfc9457#section-3.1) — extra context that helps agents self-correct without parsing the `detail` text.
+
+```json
+{
+  "type": "https://docs.listbee.so/errors/not-in-draft",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Listing is not in draft status",
+  "code": "not_in_draft",
+  "current_status": "published",
+  "required_status": "draft"
+}
+```
+
+Extension members vary by error code. Use `code` to determine which extras are present.
+
+### Readiness-bridged errors
+
+`publish_failed` includes the full readiness `actions` array — the same structured guidance you get from `GET /v1/listings/{id}`. Your agent gets the fix instructions inline with the error:
+
+```json
+{
+  "type": "https://docs.listbee.so/errors/publish-failed",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Listing cannot be published: missing payment configuration",
+  "code": "publish_failed",
+  "actions": [
+    {
+      "code": "connect_stripe",
+      "kind": "api",
+      "priority": "required",
+      "message": "Connect Stripe account to accept payments.",
+      "resolve": {
+        "method": "POST",
+        "endpoint": "/v1/account/stripe/connect"
+      }
+    }
+  ],
+  "next": "connect_stripe"
+}
+```
+
+### State and constraint errors
+
+Other errors include flat metadata about the current state or constraint:
+
+| Error code | Extension members | Meaning |
+|------------|------------------|---------|
+| `not_in_draft` | `current_status`, `required_status` | Listing must be in draft for this operation |
+| `invalid_transition` | `current_status`, `allowed_statuses` | Order is not in the required status |
+| `refund_not_allowed` | `current_status`, `allowed_statuses` | Order cannot be refunded in this status |
+| `conflict` (deliverables) | `current_count`, `max_count` | Deliverable capacity reached |
+| `rate_limited` | `retry_after` | Seconds until the rate limit resets |
+
 ## HTTP status codes
 
 | Status | When |
@@ -48,12 +105,18 @@ Use `code` for programmatic branching — `title` and `detail` may change, `code
 | Code | Status | Meaning |
 |------|--------|---------|
 | `authentication_error` | 401 | API key missing, expired, or revoked. |
-| `not_found` | 404 | Resource with this ID does not exist or belongs to another account. |
-| `invalid_price` | 422 | Price must be a positive integer (in cents). |
-| `listing_not_published` | 422 | Operation requires the listing to be published. |
-| `rate_limited` | 429 | Too many requests. Check `Retry-After` header. |
-| `idempotency_key_reuse` | 422 | Same idempotency key sent with a different request body. |
-| `idempotency_request_in_progress` | 409 | Concurrent request with this key is still in flight. |
+| `not_found` | 404 | Resource does not exist or belongs to another account. |
+| `not_in_draft` | 409 | Operation requires the listing to be in draft status. |
+| `publish_failed` | 409 | Listing cannot be published — check `actions` for what's needed. |
+| `invalid_transition` | 409 | Order is not in the required status for this operation. |
+| `conflict` | 409 | Resource constraint violated (e.g. max deliverables reached). |
+| `refund_not_allowed` | 422 | Order cannot be refunded in its current status. |
+| `missing_payment_intent` | 422 | Order has no payment to refund. |
+| `missing_stripe_connection` | 422 | Seller's Stripe account is disconnected. |
+| `validation_error` | 422 | Request field validation failed. |
+| `rate_limited` | 429 | Too many requests. Check `retry_after` in body. |
+| `idempotency_key_reuse` | 422 | Same idempotency key sent with different request body. |
+| `idempotency_request_in_progress` | 409 | Concurrent request with this key still in flight. |
 
 ## Handling errors in Python
 
@@ -65,6 +128,7 @@ from listbee.exceptions import (
     ListBeeError,
     AuthenticationError,
     NotFoundError,
+    ConflictError,
     ValidationError,
     RateLimitError,
 )
@@ -72,23 +136,27 @@ from listbee.exceptions import (
 client = ListBee(api_key="lb_...")
 
 try:
-    listing = client.listings.get("lst_abc123")
+    listing = client.listings.publish(listing_id="lst_abc123")
 except AuthenticationError:
-    # API key is invalid — re-authenticate
     print("Invalid API key")
 except NotFoundError as e:
-    # 404 — resource does not exist
     print(f"Not found: {e.detail}")
+except ConflictError as e:
+    if e.code == "publish_failed":
+        # Readiness actions embedded in the error
+        for action in e.extras.get("actions", []):
+            print(f"Fix: {action['message']}")
+    elif e.code == "not_in_draft":
+        print(f"Listing is {e.extras.get('current_status')}, must be draft")
+    else:
+        print(f"Conflict: {e.detail}")
 except ValidationError as e:
-    # 422 — check e.code and e.param for the specific field
     print(f"Validation error on '{e.param}': {e.detail}")
 except RateLimitError as e:
-    # 429 — back off and retry
-    import time
-    time.sleep(e.retry_after or 10)
+    retry_after = e.extras.get("retry_after", 10)
+    print(f"Rate limited — retry in {retry_after}s")
 except ListBeeError as e:
-    # Catch-all for any other API error
-    print(f"API error {e.status_code}: {e.code} — {e.detail}")
+    print(f"API error {e.status}: {e.code} — {e.detail}")
 ```
 </CodeBlock>
 <CodeBlock title="curl">
@@ -112,6 +180,42 @@ curl https://api.listbee.so/v1/listings/lst_doesnotexist \
 </CodeBlock>
 </CodeBlocks>
 
+## Accessing extras in SDKs
+
+Both SDKs expose extension members via `error.extras` — a dict/object of all fields beyond the standard six.
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+from listbee.exceptions import ConflictError
+
+try:
+    client.listings.publish(listing_id="lst_abc123")
+except ConflictError as e:
+    print(e.code)                    # "publish_failed"
+    print(e.extras.get("actions"))   # [{...}, ...]
+    print(e.extras.get("next"))      # "connect_stripe"
+```
+</CodeBlock>
+<CodeBlock title="TypeScript">
+```typescript
+import { ConflictError } from 'listbee';
+
+try {
+  await client.listings.publish('lst_abc123');
+} catch (e) {
+  if (e instanceof ConflictError) {
+    console.log(e.code);              // "publish_failed"
+    console.log(e.extras.actions);    // [{...}, ...]
+    console.log(e.extras.next);       // "connect_stripe"
+  }
+}
+```
+</CodeBlock>
+</CodeBlocks>
+
+Unknown extension members are preserved verbatim — as the API adds new fields, your code receives them immediately without an SDK update.
+
 ## Correlation IDs
 
 Every response includes an `x-correlation-id` header. Include it when contacting support — it ties your request to the server-side logs.
@@ -133,3 +237,4 @@ if response.status_code >= 400:
 
 - [Rate limits](/rate-limits) — handling 429 responses
 - [Idempotency](/idempotency) — safe retries for POST requests
+- [Readiness](/readiness) — structured guidance that errors mirror

@@ -8,9 +8,9 @@ A listing is a sellable item. It has a price and a hosted product page buyers vi
 
 ## How it works
 
-Listings start in `draft` status. In draft, all fields are editable and the listing is not yet visible to buyers. When you're ready, call `publish` — the listing goes live, the product page becomes accessible, and orders can be placed. After publishing, `slug` cannot be changed.
+Listings start in `draft` status. In draft, all fields are editable and the listing is not yet visible to buyers. When you're ready, call `publish` — the listing goes live, the product page becomes accessible, and orders can be placed.
 
-The product page at `url` (e.g. `https://buy.listbee.so/seo-playbook`) shows the listing name, description, price, and cover image. Buyers click the buy button and pay via Stripe Checkout. What happens after payment depends on whether the listing has deliverables attached — see [Fulfillment](/docs/fulfillment).
+The product page at `url` (e.g. `https://buy.listbee.so/aB3xK9m`) shows the listing name, description, price, and cover image. Buyers click the buy button and pay via Stripe Checkout. What happens after payment depends on whether the listing has deliverables attached — see [Fulfillment](/docs/fulfillment).
 
 Each listing must pass a readiness check before it can be published. `readiness.sellable` indicates whether a buyer can currently complete a purchase. If `false`, `readiness.actions` lists what's needed. See [Readiness](/docs/readiness).
 
@@ -34,7 +34,8 @@ listing = client.listings.create(
 
 print(listing.id)              # lst_7kQ2xY9mN3pR5tW1vB8a
 print(listing.status)          # draft
-print(listing.url)             # https://buy.listbee.so/seo-playbook-2026
+print(listing.short_code)      # aB3xK9m
+print(listing.url)             # https://buy.listbee.so/aB3xK9m
 print(listing.has_deliverables) # False
 ```
   </CodeBlock>
@@ -169,7 +170,7 @@ Publishing fails with `409` if `readiness.sellable` is `false`. Check `readiness
 
 ## Updating a listing
 
-Partial updates — only provided fields change. `slug` is locked after publishing. All other fields, including `fulfillment_url`, can be changed at any time.
+Partial updates — only provided fields change. All fields, including `fulfillment_url`, can be changed at any time.
 
 <CodeBlocks>
   <CodeBlock title="Python">
@@ -220,7 +221,7 @@ curl "https://api.listbee.so/v1/listings" \
 |-------|------|-------------|
 | `id` | string | Unique listing ID (`lst_` prefixed) |
 | `name` | string | Product name shown on the product page |
-| `slug` | string | URL-safe identifier; globally unique; auto-generated from name; locked on publish |
+| `short_code` | string | 7-character base62 identifier used in the product page URL |
 | `price` | integer | Price in cents — `1900` = $19.00 |
 | `status` | string | `draft` or `published` |
 | `has_deliverables` | boolean | Whether this listing has deliverables attached |

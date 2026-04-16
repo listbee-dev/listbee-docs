@@ -1,5 +1,5 @@
 ---
-title: Build a storefront
+title: Bulk-create listings
 subtitle: Bulk-create listings from a JSON file, then poll for orders.
 covers_endpoints: [create_listing, list_listings, list_orders]
 ---
@@ -143,7 +143,7 @@ curl "https://api.listbee.so/v1/orders?listing_id=lst_abc123&limit=50" \
 
 ## Variations
 
-**Skip already-published listings** — check `list_listings` first and skip items whose `name` already exists in the account. ListBee slugs are globally unique, so a name collision will result in a modified slug; checking by name avoids duplicates.
+**Skip already-published listings** — check `list_listings` first and skip items whose `name` already exists in the account to avoid creating duplicates.
 
 **File deliverables** — replace the URL deliverable with a file upload (`POST /v1/files`) and reference the returned `token` in `add_deliverable`. See [Sell from Claude Code](/example-claude-code) for the upload flow.
 

@@ -162,7 +162,7 @@ For the full `/fulfill` flow, including `fulfillment_url` callbacks and the stat
 
 Buyers never access files directly. Every purchase creates an **access grant** — a short-lived, tokenized download session:
 
-- **Token-based access** — buyers receive a unique URL like `buy.listbee.so/{slug}?token=abc...`. The token is a 32-character random string, not guessable.
+- **Token-based access** — buyers receive a unique URL like `buy.listbee.so/{short_code}?token=abc...`. The token is a 32-character random string, not guessable.
 - **Expiry** — 72 hours from payment, or 10 page views, whichever comes first. After expiry, the download page returns 404.
 - **Signed CDN URLs** — file deliverables are served through signed URLs generated on each page view. The signed URL expires in minutes, preventing link sharing.
 - **Per-order isolation** — each order gets its own access grant. Revoking or refunding one order does not affect another buyer's access.

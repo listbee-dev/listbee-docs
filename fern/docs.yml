@@ -48,8 +48,6 @@ navigation:
         contents:
           - page: Authentication
             path: ./docs/pages/authentication.mdx
-          - page: Stores
-            path: ./docs/pages/stores.mdx
           - page: Listings
             path: ./docs/pages/listings.mdx
           - page: Deliverables
@@ -97,7 +95,7 @@ navigation:
           - page: Sell from n8n
             slug: example-n8n
             path: ./docs/pages/example-n8n.mdx
-          - page: Build a Storefront
+          - page: Bulk-create listings
             slug: example-storefront
             path: ./docs/pages/example-storefront.mdx
 

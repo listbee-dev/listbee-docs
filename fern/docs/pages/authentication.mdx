@@ -1,17 +1,17 @@
 ---
 title: Authentication
-subtitle: Bootstrap a store and get an API key in three steps — no console required
-covers_endpoints: [bootstrap_start, bootstrap_verify, bootstrap_store, get_store]
+subtitle: Bootstrap an account and get an API key in three steps — no console required
+covers_endpoints: [bootstrap_start, bootstrap_verify, bootstrap_complete]
 ---
 
-All ListBee API requests authenticate with an API key passed as a Bearer token. Keys have the prefix `lb_` and are tied to a [store](/stores).
+All ListBee API requests authenticate with an API key passed as a Bearer token. Keys have the prefix `lb_` and are tied to an account.
 
 ## Two ways to get a key
 
-1. **Bootstrap API** (agent-driven) — the agent creates a store and gets a key via 3 API calls. A human provides their email and an OTP code.
-2. **Console** (human-driven) — sign in at [console.listbee.so](https://console.listbee.so). A default store and key are created on first login.
+1. **Bootstrap API** (agent-driven) — the agent creates an account and gets a key via 3 API calls. A human provides their email and an OTP code.
+2. **Console** (human-driven) — sign in at [console.listbee.so](https://console.listbee.so). An account and key are created on first login.
 
-Both paths produce the same result: a store with an API key.
+Both paths produce the same result: an account with an API key.
 
 ## Bootstrap flow
 
@@ -68,25 +68,23 @@ curl -X POST https://api.listbee.so/v1/bootstrap/verify \
 </CodeBlock>
 </CodeBlocks>
 
-If the email is new, an account is created. If it already exists, the existing account is used. The agent doesn't know which case occurred.
+If the email is new, an account is created. If it already exists, the existing account is returned. The agent doesn't need to know which case occurred.
 
-### Step 3: Create store
+### Step 3: Complete bootstrap
 
 <CodeBlocks>
 <CodeBlock title="Python">
 ```python
-store = client.bootstrap.create_store(
-    session=session,
-    store_name="SEO Pro"
-)
-api_key = store.api_key  # lb_... — shown once, save it
+result = client.bootstrap.complete(session=session)
+api_key = result.api_key  # lb_... — shown once, save it
+account_id = result.account_id  # acc_...
 ```
 </CodeBlock>
 <CodeBlock title="curl">
 ```bash
-curl -X POST https://api.listbee.so/v1/bootstrap/store \
+curl -X POST https://api.listbee.so/v1/bootstrap/complete \
   -H "Content-Type: application/json" \
-  -d '{"session": "sess_abc123...", "store_name": "SEO Pro"}'
+  -d '{"session_id": "sess_abc123..."}'
 ```
 </CodeBlock>
 </CodeBlocks>
@@ -95,21 +93,13 @@ Response:
 
 ```json
 {
-  "object": "store",
-  "id": "st_7kQ2xY9mN3pR5tW1vB8a",
-  "api_key": "lb_abc123...",
-  "display_name": "SEO Pro",
-  "slug": "seo-pro",
-  "url": "https://buy.listbee.so/seo-pro",
-  "readiness": {
-    "sellable": false,
-    "actions": [{ "code": "connect_stripe", "kind": "human", "message": "Connect Stripe to accept payments" }],
-    "next": "connect_stripe"
-  }
+  "object": "bootstrap",
+  "account_id": "acc_7kQ2xY9mN3pR5tW1vB8a",
+  "api_key": "lb_abc123..."
 }
 ```
 
-The `api_key` is returned once. Store it and use it as `Authorization: Bearer lb_...` for all subsequent requests.
+The `api_key` is returned once. Save it and use it as `Authorization: Bearer lb_...` for all subsequent requests.
 
 ## Using a key
 
@@ -117,20 +107,19 @@ The `api_key` is returned once. Store it and use it as `Authorization: Bearer lb
 Authorization: Bearer lb_...
 ```
 
-Each key belongs to one store. All operations through that key are scoped to that store's listings, orders, and webhooks.
+Each key belongs to one account. All operations through that key are scoped to that account's listings, orders, and webhooks.
 
 Missing or invalid keys return `401`.
 
-## Same email, second store
+## Same email, existing account
 
-An agent bootstrapping with an email that already has an account creates a new store on that account. If Stripe is already connected, the new store is immediately sellable.
+Bootstrapping with an email that already has an account returns the existing account. If Stripe was already connected, the account is immediately sellable.
 
 ## Key rotation
 
-Keys can be rotated in the [console](https://console.listbee.so). The old key is immediately invalidated. The store ID stays the same.
+Keys can be rotated in the [console](https://console.listbee.so). The old key is immediately invalidated. The account ID stays the same.
 
 ## Related
 
-- [Stores](/stores) — how stores work as brand identity and scoping
 - [Quickstart](/quickstart) — bootstrap to first listing in 5 minutes
-- [Readiness](/readiness) — what readiness tells you about store and listing state
+- [Readiness](/readiness) — what readiness tells you about account and listing state

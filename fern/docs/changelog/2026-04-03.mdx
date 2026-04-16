@@ -9,11 +9,11 @@ ListBee's API is now simpler and more powerful. Stores have been removed, listin
 ## What changed
 
 - **Breaking:** Store entity removed — accounts own listings directly. All `/v1/stores/` endpoints are gone. Profile fields (display name, bio, avatar) now live on the account.
-- **Breaking:** Listing management routes changed from `/{slug}` to `/{listing_id}`. Slugs are still used for public product page URLs.
+- **Breaking:** Listing management routes changed from `/{slug}` to `/{listing_id}`. Public product page URLs now use a `short_code` (7-char base62) instead of a slug.
 - **Breaking:** Listing states changed from active/paused to **draft/published/paused**. New listings start as drafts and must be explicitly published.
 - **Changed:** Deliverables are now mutable. Set, replace, or remove a listing's deliverable via `PUT /v1/listings/{id}/deliverable` and `DELETE /v1/listings/{id}/deliverable`. Draft state only.
 - **Changed:** File upload via `POST /v1/files` returns a token. Pass the token to the deliverable endpoint to attach files.
-- **Changed:** Slugs are now derived from the listing name (human-readable). Changeable in draft, frozen after publish.
+- **Changed:** Listing URLs now use a `short_code` (e.g. `buy.listbee.so/aB3xK9m`) — auto-generated, stable, not changeable.
 - **Changed:** Fulfillment mode is computed from deliverable presence — no longer set explicitly.
 - **Removed:** Custom domains.
 - **Removed:** Multi-store support. One account = one brand.

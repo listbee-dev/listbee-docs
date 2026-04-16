@@ -21,7 +21,7 @@ Account
 
 An **Account** is the root entity. Everything belongs to an account. One account maps to one Stripe Connect onboarding, one billing subscription, and one brand (display name, bio, avatar).
 
-**Listings** are the sellable items an account creates. Each listing has a hosted product page at `buy.listbee.so/{slug}`. Listings belong to an account and can have up to three deliverables.
+**Listings** are the sellable items an account creates. Each listing has a hosted product page at `buy.listbee.so/{short_code}`. Listings belong to an account and can have up to three deliverables.
 
 **Orders** are created when a buyer submits a checkout form. They progress through a state machine from `pending` (form submitted, awaiting payment) to a terminal state (`fulfilled`, `canceled`, or `failed`). Each order holds a snapshot of the listing and seller at time of purchase.
 

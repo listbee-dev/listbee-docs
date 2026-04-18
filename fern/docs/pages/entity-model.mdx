@@ -1,6 +1,6 @@
 ---
 title: Entity model
-subtitle: The objects ListBee manages and how they relate to each other.
+subtitle: The objects ListBee manages and how they relate.
 covers_endpoints: []
 ---
 
@@ -11,41 +11,37 @@ ListBee is organized around a small set of entities. Understanding their relatio
 ```
 Account
 ├── Listings
-│   └── Deliverables (up to 3 per listing)
+│   └── Deliverable (one, optional, for static mode)
 ├── Orders
-│   └── AccessGrants (one per fulfilled order)
-├── Webhooks
-│   └── WebhookEvents
+│   └── Deliverable (one, set at fulfillment time)
+├── Events
 └── ApiKeys
 ```
 
 An **Account** is the root entity. Everything belongs to an account. One account maps to one Stripe Connect onboarding, one billing subscription, and one brand (display name, bio, avatar).
 
-**Listings** are the sellable items an account creates. Each listing has a hosted product page at `buy.listbee.so/{short_code}`. Listings belong to an account and can have up to three deliverables.
+**Identities** authenticate the human behind an account — currently email OTP; Google and GitHub OAuth are stubbed for later. An account can have multiple identities that resolve to the same owner.
 
-**Orders** are created when a buyer submits a checkout form. They progress through a state machine from `pending` (form submitted, awaiting payment) to a terminal state (`fulfilled`, `canceled`, or `failed`). Each order holds a snapshot of the listing and seller at time of purchase.
+**Listings** are the sellable items an account creates. Each listing has a hosted product page at `buy.listbee.so/{short_code}`, a per-listing `signing_secret` for webhook verification, and an optional `agent_callback_url`. A listing in `static` mode carries a pre-baked deliverable; `async` mode leaves delivery to `POST /v1/orders/{id}/fulfill`.
 
-**AccessGrants** are created automatically when an order reaches `fulfilled`. They contain a signed download token valid for 48 hours and up to 10 downloads. Buyers access their content through this token — ListBee never emails download links directly.
+**Orders** are created when Stripe confirms payment. They progress from `paid` to `fulfilled`. Each order holds an immutable snapshot of the listing and seller at purchase time, plus a permanent `unlock_url` the buyer uses to retrieve the deliverable.
 
-**Webhooks** are outbound HTTP endpoints you configure to receive events. Each webhook filters by event type and has a signing secret (`whsec_...`) for payload verification.
+**Events** are persisted records of domain events (`order.paid`, `order.fulfilled`, `order.refunded`, `order.disputed`). Queryable via `GET /v1/events` for reconciliation, and the same shape is POSTed to `agent_callback_url` for real-time delivery.
 
-**WebhookEvents** are individual delivery attempts. If delivery fails, ListBee retries with exponential backoff. You can inspect event history and retry manually via the API.
-
-**ApiKeys** are the machine credentials used to authenticate API requests. The `lb_` value is shown once at creation. The stored entity has prefix `ak_` and stores only a hashed form.
+**ApiKeys** are the machine credentials used to authenticate API requests. The `lb_` value is returned once at creation — stored as a hash. Entity ID uses the `lbk_` prefix.
 
 ## ID prefix table
 
 | Prefix | Entity | Example |
 |--------|--------|---------|
 | `acc_` | Account | `acc_7kQ2xY9mN3pR5tW1vB8a` |
+| `idn_` | Identity | `idn_7kQ2xY9mN3pR5tW1vB8a` |
 | `lst_` | Listing | `lst_7kQ2xY9mN3pR5tW1vB8a` |
 | `ord_` | Order | `ord_7kQ2xY9mN3pR5tW1vB8a` |
-| `ag_` | AccessGrant | `ag_7kQ2xY9mN3pR5tW1vB8a` |
-| `wh_` | Webhook | `wh_7kQ2xY9mN3pR5tW1vB8a` |
-| `evt_` | WebhookEvent | `evt_7kQ2xY9mN3pR5tW1vB8a` |
-| `ak_` | ApiKey (entity) | `ak_7kQ2xY9mN3pR5tW1vB8a` |
-| `lbk_` | ApiKey (entity, alternate) | `lbk_7kQ2xY9mN3pR5tW1vB8a` |
-| `lb_` | API key value (bearer token) | `lb_abcdefghijklmnopqrstuvwx` |
+| `evt_` | Event | `evt_7kQ2xY9mN3pR5tW1vB8a` |
+| `lbk_` | ApiKey (entity) | `lbk_7kQ2xY9mN3pR5tW1vB8a` |
+| `lb_` | API key bearer token | `lb_abcdefghijklmnopqrstuvwx` |
+| `bst_` | Bootstrap token | `bst_abc123` |
 
 IDs use base62 encoding over a UUID4 and are always 22 characters after the prefix.
 
@@ -55,46 +51,44 @@ IDs use base62 encoding over a UUID4 and are always 22 characters after the pref
 |--------|-------------|
 | `draft` | Created but not published. Not accessible to buyers. |
 | `published` | Live. Product page accepts orders. |
-| `archived` | Taken offline. Product page returns 404. |
+| `archived` | Terminal. Product page returns 404. No re-publish. |
 
-A listing can be published once the account has completed Stripe Connect onboarding. Listings with deliverables deliver automatically on payment. Listings without deliverables rely on a webhook or `fulfillment_url` callback for delivery — both paths satisfy the readiness check.
+Buyability is derived from status plus account readiness. A `published` listing on an account without Stripe Connect shows a disabled buy button until onboarding completes.
 
 ## Order states
 
 | Status | Description |
 |--------|-------------|
-| `pending` | Buyer submitted form, awaiting payment |
-| `paid` | Stripe confirmed payment; delivery in progress |
-| `fulfilled` | Buyer received content |
-| `canceled` | Abandoned or manually canceled (24h TTL on `pending`) |
-| `failed` | Payment or delivery error |
+| `paid` | Stripe confirmed payment; order exists |
+| `fulfilled` | Deliverable attached and emailed to buyer |
+
+Two orthogonal axes run in parallel:
+
+- `payment_status`: `paid` or `refunded`
+- `dispute_status`: `null`, `needs_response`, `under_review`, `won`, `lost`
 
 ## Deliverable types
 
-Each listing can have up to three deliverables in any combination:
+| Type   | Delivered as |
+|--------|--------------|
+| `url`  | 302 redirect from the unlock page to the stored URL |
+| `text` | Rendered Markdown on the unlock page |
 
-| Type | What it is | Delivered as |
-|------|-----------|-------------|
-| `FILE` | Uploaded file (PDF, ZIP, etc.) | Signed download URL (48h, 10 downloads) |
-| `URL` | External link | Redirect on the download page |
-| `TEXT` | Raw text (license key, instructions, etc.) | Rendered on the download page |
+## Event types
 
-## Webhook events
+| Event             | When |
+|-------------------|------|
+| `order.paid`      | Payment confirmed by Stripe |
+| `order.fulfilled` | Deliverable attached (static at paid, async via `/fulfill`) |
+| `order.refunded`  | Full refund issued |
+| `order.disputed`  | Buyer opened a Stripe dispute |
 
-| Event | When |
-|-------|------|
-| `order.paid` | Buyer's payment succeeded |
-| `order.fulfilled` | Order delivery confirmed |
-| `order.refunded` | Refund issued |
-| `order.canceled` | Order abandoned or canceled |
-| `listing.published` | Listing went live |
-
-Both `order.paid` and `order.fulfilled` fire for every order. Agents relying on `order.fulfilled` as the delivery signal will work consistently regardless of how the listing is configured.
+Both `order.paid` and `order.fulfilled` fire for every order. Agents can rely on `order.fulfilled` as the universal delivery signal.
 
 ## Related
 
-- [Listings](/docs/listings)
-- [Deliverables](/docs/deliverables)
-- [Orders](/docs/orders)
-- [Webhooks](/docs/webhooks)
-- [Fulfillment](/docs/fulfillment)
+- [Listings](/listings)
+- [Deliverables](/deliverables)
+- [Orders](/orders)
+- [Events](/events)
+- [Fulfillment](/fulfillment)

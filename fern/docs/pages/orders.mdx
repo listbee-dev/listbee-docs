@@ -1,217 +1,201 @@
 ---
 title: Orders
-subtitle: Track and manage buyer transactions from checkout to delivery
-covers_endpoints: [list_orders, get_order, fulfill_order, refund_order]
+subtitle: Paid buyer transactions — fulfillment, refunds, and unlock URLs
+covers_endpoints: [list_orders, get_order, fulfill_order, redeliver_order, refund_order]
 ---
 
-An order is created when a buyer starts a Stripe Checkout session. It captures the buyer's email, the listing being purchased, and the amount paid. Orders move through a status lifecycle that ends at `fulfilled`, `canceled`, or `failed`.
+An order is created when Stripe confirms payment. It captures the buyer's email, the listing purchased, the amount paid, and an immutable snapshot of the listing and seller at that moment.
 
-## How it works
+## Lifecycle
 
-An order begins as `pending` the moment a buyer submits the checkout form. It transitions to `paid` when Stripe confirms payment. From there:
+```
+PAID  →  FULFILLED
+```
 
-- If the listing has deliverables, ListBee auto-delivers and transitions the order to `fulfilled`.
-- If the listing has no deliverables, the order stays `paid` and ListBee fires `order.paid` to your webhook. Your agent handles delivery — or calls `POST /v1/orders/{id}/fulfill` to have ListBee deliver.
+- **`paid`** — Stripe confirmed payment. Order exists. For `static` listings, the next step is automatic. For `async` listings, the agent calls `/fulfill`.
+- **`fulfilled`** — content has been delivered. `deliverable` and `fulfilled_at` are set.
 
-Orders have two independent status fields: `status` (fulfillment lifecycle) and `payment_status` (Stripe payment state). An order can be `fulfilled` with `payment_status: paid`, then later have `payment_status: refunded` if a refund is issued.
+No `pending`, no `canceled`, no `failed`. Pre-payment state lives in Stripe's Checkout Session — no ListBee order exists until the `checkout.session.completed` webhook fires.
 
-Each order includes `listing_snapshot` and `seller_snapshot` — immutable copies of the listing and seller data captured at payment time. These are the authoritative record of what was purchased, regardless of later changes to the listing.
+Two orthogonal axes run in parallel to this lifecycle:
+
+- **`payment_status`** — `paid` or `refunded`. A `fulfilled` order can still be refunded.
+- **`dispute_status`** — `null`, `needs_response`, `under_review`, `won`, `lost`. Managed by Stripe.
+
+A healthy, reconciled order satisfies all three:
+
+```
+status == fulfilled  AND  payment_status == paid  AND  dispute_status IS NULL
+```
 
 ## Fetching an order
 
 <CodeBlocks>
-  <CodeBlock title="Python">
+<CodeBlock title="Python">
 ```python
-from listbee import ListBee
-
-client = ListBee(api_key="lb_...")
-
 order = client.orders.get(order_id="ord_9xM4kP7nR2qT5wY1")
-
-print(order.status)          # fulfilled
-print(order.payment_status)  # paid
-print(order.buyer_email)     # buyer@example.com
+print(order.status)          # paid | fulfilled
+print(order.payment_status)  # paid | refunded
 print(order.amount)          # 1900 ($19.00)
-print(order.has_deliverables) # True
+print(order.unlock_url)      # permanent bearer link
 ```
-  </CodeBlock>
-  <CodeBlock title="curl">
+</CodeBlock>
+<CodeBlock title="curl">
 ```bash
 curl https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1 \
   -H "Authorization: Bearer lb_..."
 ```
-  </CodeBlock>
+</CodeBlock>
 </CodeBlocks>
 
 ## Listing orders
 
+Cursor-paginated. Filter by `status` (`paid` | `fulfilled`) or `listing_id`.
+
 <CodeBlocks>
-  <CodeBlock title="Python">
+<CodeBlock title="Python">
 ```python
-result = client.orders.list()
+result = client.orders.list(status="paid")
 
 for order in result.data:
-    print(order.id, order.status, order.buyer_email)
+    print(order.id, order.buyer_email, order.amount)
 
-# Filter by status
-paid_orders = client.orders.list(status="paid")
-
-# Next page
 if result.has_more:
-    next_page = client.orders.list(cursor=result.cursor)
+    next_page = client.orders.list(status="paid", cursor=result.cursor)
 ```
-  </CodeBlock>
-  <CodeBlock title="curl">
+</CodeBlock>
+<CodeBlock title="curl">
 ```bash
 curl "https://api.listbee.so/v1/orders?status=paid" \
   -H "Authorization: Bearer lb_..."
 ```
-  </CodeBlock>
+</CodeBlock>
 </CodeBlocks>
 
-## Fulfilling an order
+## Fulfilling
 
-Call `fulfill` on any `paid` order to push content to the buyer. ListBee creates an access grant, emails the buyer a download link, and transitions the order to `fulfilled`. Idempotent — calling it on an already-`fulfilled` order is a no-op.
+`POST /v1/orders/{id}/fulfill` pushes the generated content to a `paid` order. ListBee stores the deliverable on the order, emails the buyer the `unlock_url`, and transitions the order to `fulfilled`.
 
 <CodeBlocks>
-  <CodeBlock title="Python">
+<CodeBlock title="Python">
 ```python
 from listbee import Deliverable
 
 client.orders.fulfill(
     order_id="ord_9xM4kP7nR2qT5wY1",
-    deliverables=[
-        Deliverable.text("Your personalized report: ..."),
-    ],
+    deliverable=Deliverable.text("Your personalized report: ..."),
+    metadata={"generated_by": "agent-v3", "model": "claude-opus-4.7"},
 )
 ```
-  </CodeBlock>
-  <CodeBlock title="TypeScript">
-```typescript
-import { Deliverable } from 'listbee';
-
-await client.orders.fulfill('ord_9xM4kP7nR2qT5wY1', {
-  deliverables: [
-    Deliverable.text('Your personalized report: ...'),
-  ],
-});
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
+</CodeBlock>
+<CodeBlock title="curl">
 ```bash
 curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill \
   -H "Authorization: Bearer lb_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "deliverables": [
-      {"type": "text", "value": "Your personalized report: ..."}
-    ]
+    "deliverable": {"type": "text", "value": "Your personalized report: ..."},
+    "metadata": {"generated_by": "agent-v3"}
   }'
 ```
-  </CodeBlock>
+</CodeBlock>
 </CodeBlocks>
 
-Same deliverable types as listing attachments — `file`, `url`, `text`. Up to 3 per call, mixed types allowed. The `Deliverable` builder handles file uploads automatically. See [Deliverables](/docs/deliverables) for types, hosting, and limits.
+Idempotent: calling `/fulfill` again with the same deliverable on an already-`fulfilled` order is a no-op. Only one deliverable per order — see [Deliverables](/deliverables).
 
-## Issuing a refund
+## Unlock URL
+
+Every `paid` order has an `unlock_url` that takes the buyer to their content:
+
+- `url` deliverables → 302 redirect to the stored URL
+- `text` deliverables → rendered Markdown page
+- `paid` but not yet `fulfilled` (async) → processing page that polls until content arrives
+
+The URL is a permanent bearer link. No expiry, no view counter, no per-buyer revocation. Anyone with the link can access the content. If you need stricter access control, host the content at a URL that enforces it.
+
+## Redelivering webhooks
+
+If your `agent_callback_url` was down or misconfigured when an order happened, requeue the delivery:
 
 <CodeBlocks>
-  <CodeBlock title="Python">
+<CodeBlock title="Python">
+```python
+ack = client.orders.redeliver(order_id="ord_9xM4kP7nR2qT5wY1")
+print(ack.scheduled_attempts)  # count of events re-queued
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/redeliver \
+  -H "Authorization: Bearer lb_..." \
+  -H "Idempotency-Key: retry-2026-04-18-ord_9xM4kP7nR2qT5wY1"
+```
+</CodeBlock>
+</CodeBlocks>
+
+Response:
+
+```json
+{"object": "redelivery_ack", "order_id": "ord_9xM4kP7nR2qT5wY1", "scheduled_attempts": 2}
+```
+
+Rate limits: 10 redeliveries/hour per order, 100/hour per API key. If the listing has no `agent_callback_url`, `scheduled_attempts` is `0` — use `GET /v1/events` to poll instead. See [Events](/events).
+
+## Refunding
+
+Full refund only. The platform fee is not returned to the seller.
+
+<CodeBlocks>
+<CodeBlock title="Python">
 ```python
 order = client.orders.refund(order_id="ord_9xM4kP7nR2qT5wY1")
-
 print(order.payment_status)  # refunded
 print(order.refund_amount)   # 1900
 ```
-  </CodeBlock>
-  <CodeBlock title="curl">
+</CodeBlock>
+<CodeBlock title="curl">
 ```bash
 curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/refund \
   -H "Authorization: Bearer lb_..."
 ```
-  </CodeBlock>
+</CodeBlock>
 </CodeBlocks>
 
-Only orders with `status: paid` or `status: fulfilled` can be refunded. The API returns specific error codes for each failure case:
+Refunding emits `order.refunded`. The order's `status` (paid/fulfilled) does not change — only `payment_status` does.
 
-- `refund_not_allowed` — order is in a status that cannot be refunded (includes `current_status` and `allowed_statuses`)
-- `missing_payment_intent` — order has no Stripe payment to refund
-- `missing_stripe_connection` — seller's Stripe account is disconnected
+## Metadata
 
-Refunds are processed through Stripe on the seller's connected account. The platform fee is not returned to the seller.
+`metadata` on an order is a free-form dict:
 
-## Order status lifecycle
+- Listing metadata is snapshotted onto the order at checkout time.
+- `/fulfill` can attach additional metadata (e.g. generation parameters).
 
-| Status | Meaning |
-|--------|---------|
-| `pending` | Checkout started; buyer data captured; awaiting payment |
-| `paid` | Stripe confirmed payment; delivery in progress |
-| `fulfilled` | Content delivered to buyer |
-| `canceled` | Checkout abandoned or payment failed after 24h |
-| `failed` | System error during payment or delivery |
-
-## Order readiness
-
-Every order response includes a `readiness` object with a `fulfilled` flag — `true` when content has been delivered to the buyer.
-
-`paid` orders that are not yet fulfilled include a `fulfill_order` action suggesting your agent push content via the fulfill endpoint. Fulfilled, canceled, and failed orders have empty actions.
-
-```json
-{
-  "object": "order",
-  "id": "ord_9xM4kP7nR2qT5wY1",
-  "status": "paid",
-  "readiness": {
-    "fulfilled": false,
-    "actions": [
-      {
-        "code": "fulfill_order",
-        "kind": "api",
-        "priority": "suggested",
-        "message": "Deliver content to buyer via ListBee",
-        "resolve": {
-          "method": "POST",
-          "endpoint": "/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill"
-        }
-      }
-    ],
-    "next": null
-  }
-}
-```
+Stripe-aligned limits: max 50 keys, keys ≤ 40 chars, string values ≤ 500 chars, no nesting. Flows through to webhook payloads.
 
 ## Key fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Unique order ID (`ord_` prefixed) |
-| `listing_id` | string | ID of the purchased listing |
-| `buyer_email` | string | Buyer's email address from Stripe Checkout |
-| `amount` | integer | Amount paid in cents |
-| `currency` | string | Three-letter ISO currency code, uppercase |
-| `status` | string | Fulfillment lifecycle status |
-| `payment_status` | string | Stripe payment state: `unpaid`, `paid`, or `refunded` |
-| `has_deliverables` | boolean | Whether the listing had deliverables at time of purchase |
-| `checkout_data` | object | Custom field values submitted by the buyer |
-| `listing_snapshot` | object | Immutable copy of listing data at payment time |
-| `seller_snapshot` | object | Immutable copy of seller identity at payment time |
-| `deliverables` | array | Content attached to this order |
-| `readiness` | object | Readiness status: `fulfilled` flag + `actions` array with next steps |
-| `stripe_payment_intent_id` | string | Stripe PaymentIntent ID for cross-referencing |
-| `platform_fee` | integer | Platform fee deducted in cents |
-| `refund_amount` | integer | Amount refunded in cents; `0` if not refunded |
-| `paid_at` | string | When payment was confirmed |
-| `fulfilled_at` | string | When order was fulfilled |
-| `refunded_at` | string \| null | When the refund was processed |
-| `dispute_status` | string \| null | Stripe dispute status if disputed |
-| `dispute_reason` | string \| null | Reason for the dispute |
-| `dispute_amount` | integer | Disputed amount in cents; `0` if not disputed |
-| `disputed_at` | string \| null | When the dispute was opened |
-| `created_at` | string | When the order was created |
+| Field                   | Type    | Description |
+|-------------------------|---------|-------------|
+| `id`                    | string  | Unique order ID (`ord_`) |
+| `listing_id`            | string  | Purchased listing |
+| `status`                | string  | `paid` or `fulfilled` |
+| `payment_status`        | string  | `paid` or `refunded` |
+| `dispute_status`        | string  | `null`, `needs_response`, `under_review`, `won`, `lost` |
+| `deliverable`           | object  | Content delivered (null until `fulfilled`) |
+| `unlock_url`            | string  | Permanent bearer link to the unlock page |
+| `buyer_email`           | string  | From Stripe Checkout |
+| `amount`                | integer | Cents |
+| `checkout_data`         | object  | Buyer's submitted custom fields |
+| `metadata`              | object  | Forwarded in webhook payloads |
+| `listing_snapshot`      | object  | Immutable listing data at payment time |
+| `seller_snapshot`       | object  | Immutable seller identity at payment time |
+| `readiness`             | object  | `fulfilled` flag + `actions` |
+| `stripe_payment_intent_id` | string | For cross-referencing in Stripe |
+| `refund_amount`         | integer | `0` if not refunded |
 
 ## Related
 
-- [Deliverables](/docs/deliverables) — types, file uploads, and the `/fulfill` endpoint
-- [Fulfillment](/docs/fulfillment) — how deliverables affect the order lifecycle
-- [Webhooks](/docs/webhooks) — receiving `order.paid` and `order.fulfilled` events
-- [Listings](/docs/listings) — how listings drive order behavior
+- [Deliverables](/deliverables) — URL vs text, SDK builders
+- [Fulfillment](/fulfillment) — webhook signing, retries, redelivery
+- [Events](/events) — reconciliation feed for missed webhooks
+- [Readiness](/readiness) — `fulfillment_pending`, `dispute_open`

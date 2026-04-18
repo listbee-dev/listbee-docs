@@ -56,10 +56,10 @@ navigation:
             path: ./docs/pages/orders.mdx
           - page: Fulfillment
             path: ./docs/pages/fulfillment.mdx
+          - page: Events
+            path: ./docs/pages/events.mdx
           - page: Readiness
             path: ./docs/pages/readiness.mdx
-          - page: Webhooks
-            path: ./docs/pages/webhooks.mdx
 
       - section: Guides
         skip-slug: true

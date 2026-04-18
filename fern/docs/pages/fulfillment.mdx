@@ -1,142 +1,208 @@
 ---
 title: Fulfillment
-subtitle: How ListBee delivers content to buyers after payment
-covers_endpoints: [create_listing, fulfill_order]
+subtitle: How ListBee delivers content after payment — static, async, and the webhook pipeline
+covers_endpoints: [create_listing, update_listing, fulfill_order, redeliver_order, list_events]
 ---
 
-Fulfillment is what happens after a buyer pays. The behavior is derived from whether the listing has deliverables attached — no explicit mode to configure.
+Fulfillment is what happens after `checkout.session.completed` fires on Stripe. ListBee creates the order, captures snapshots, and either delivers immediately or waits for the agent to push content.
 
-## How it works
+## Two modes
 
-When Stripe confirms payment, ListBee inspects the order and takes the appropriate action:
+The listing's `fulfillment_mode` decides:
 
-- **Has deliverables** — ListBee immediately creates an access grant, emails the buyer a download link, and marks the order `fulfilled`. No action required from you.
-- **No deliverables** — ListBee fires `order.paid` to your configured webhook. Your system handles delivery. Optionally, your agent can call `POST /v1/orders/{id}/fulfill` to push content back to ListBee for delivery.
+- **`static`** — the listing carries a pre-baked `deliverable`. ListBee delivers it at `order.paid`, fires `order.fulfilled`, transitions the order to `fulfilled`. No agent code runs.
+- **`async`** — the listing has no deliverable. ListBee fires `order.paid`. The agent generates content and calls `POST /v1/orders/{id}/fulfill`. ListBee emails the unlock URL and fires `order.fulfilled`.
 
-`order.fulfilled` fires when an order reaches the `fulfilled` state. `order.paid` fires for every order.
+Pick static for fixed content (ebooks, links, license keys). Pick async for anything generated per-order (personalized reports, AI output, invite codes).
 
-## The `fulfillment_url` callback
+## Delivery channels
 
-Set `fulfillment_url` on a listing to receive a POST request from ListBee when each order is paid. This is a per-listing callback — separate from your account-level webhooks.
+There are two ways to learn about orders:
 
-The payload includes enriched metadata so your agent can act without any lookups:
+1. **Per-listing webhook** — set `agent_callback_url` on the listing. ListBee POSTs signed events to that URL.
+2. **Polling** — `GET /v1/orders` or `GET /v1/events`. Useful as a fallback or primary channel for stateless workers.
+
+Both can be used together. The event log (`/v1/events`) is always populated regardless of webhook delivery outcome.
+
+## Webhook events
+
+Delivered to `agent_callback_url` (when set):
+
+| Event              | Fires when                                         |
+|--------------------|----------------------------------------------------|
+| `order.paid`       | Stripe confirmed payment, order exists             |
+| `order.fulfilled`  | Deliverable attached (static or via `/fulfill`)    |
+| `order.refunded`   | Full refund issued                                 |
+| `order.disputed`   | Buyer opened a Stripe dispute                      |
+
+Static listings fire `order.paid` and `order.fulfilled` back-to-back. Async listings fire `order.paid`, then `order.fulfilled` whenever the agent calls `/fulfill`.
+
+## Payload shape
 
 ```json
 {
-  "order_id": "ord_9xM4kP7nR2qT5wY1",
-  "listing_id": "lst_7kQ2xY9mN3pR5tW1vB8a",
-  "buyer_email": "buyer@example.com",
-  "amount": 4900,
-  "has_deliverables": false,
-  "listing_metadata": {"product_tier": "pro", "template_id": "rpt-42"},
-  "checkout_data": {"company": "Acme Corp", "use_case": "quarterly review"},
-  "fulfill_url": "https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill"
+  "id": "evt_01J3K4M5N6P7Q8R9S0T1U2V3W4",
+  "type": "order.paid",
+  "created": "2026-04-17T10:23:00Z",
+  "api_version": "2026-04-17",
+  "data": {
+    "object": "order",
+    "id": "ord_9xM4kP7nR2qT5wY1",
+    "status": "paid",
+    "amount": 4900,
+    "currency": "USD",
+    "buyer_email": "buyer@example.com",
+    "checkout_data": {"ticker": "AAPL", "period": "Q1 2026"},
+    "metadata": {"generated_by": "agent-v3"},
+    "listing": {
+      "id": "lst_7kQ2xY9mN3pR5tW1vB8a",
+      "name": "Custom Market Analysis",
+      "fulfillment_mode": "async",
+      "metadata": {"report_type": "market_analysis"}
+    },
+    "unlock_url": "https://buy.listbee.so/unlock/abc123..."
+  }
 }
 ```
 
-`fulfill_url` is the endpoint your agent calls to push generated content back. `fulfillment_url` is where ListBee calls your agent — they are distinct.
+Listing and order `metadata` both ride through — your agent doesn't need a state lookup to respond.
+
+## Verifying signatures
+
+Each POST to `agent_callback_url` includes:
+
+- `X-ListBee-Signature: t=1713436980,v1=abc123...` — timestamp + HMAC-SHA256 hex
+- `X-ListBee-Event: order.paid` — event type for quick routing
+
+The signing key is the listing's `signing_secret`. Signed payload is `f"{timestamp}.{raw_body}"`. Reject requests with `|now - t| > 300s` to defend against replay.
 
 <CodeBlocks>
-  <CodeBlock title="Python">
+<CodeBlock title="Python">
 ```python
-from listbee import ListBee
+import hmac
+import hashlib
+import time
 
-client = ListBee(api_key="lb_...")
+def verify(body: bytes, header: str, secret: str, tolerance: int = 300) -> bool:
+    parts = dict(p.split("=", 1) for p in header.split(","))
+    ts = int(parts["t"])
+    if abs(time.time() - ts) > tolerance:
+        return False
+    expected = hmac.new(
+        secret.encode(),
+        f"{ts}.".encode() + body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, parts["v1"])
 
-listing = client.listings.create(
-    name="Personalized Investment Report",
-    price=4900,
-    fulfillment_url="https://your-agent.example.com/hooks/listbee",
-    metadata={"product_tier": "pro", "template_id": "rpt-42"},
-)
-
-client.listings.publish(listing_id=listing.id)
+# In your handler:
+raw_body = request.body()                     # raw bytes, not parsed JSON
+header = request.headers["X-ListBee-Signature"]
+if not verify(raw_body, header, LISTING_SIGNING_SECRET):
+    return 401
 ```
-  </CodeBlock>
-  <CodeBlock title="curl">
+</CodeBlock>
+<CodeBlock title="curl">
 ```bash
-curl -X POST https://api.listbee.so/v1/listings \
-  -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Personalized Investment Report",
-    "price": 4900,
-    "fulfillment_url": "https://your-agent.example.com/hooks/listbee",
-    "metadata": {"product_tier": "pro", "template_id": "rpt-42"}
-  }'
+# No curl verification flow — signatures are verified on the receiving server
+# using the per-listing signing_secret returned at listing creation.
 ```
-  </CodeBlock>
+</CodeBlock>
 </CodeBlocks>
 
-## The `/fulfill` endpoint
+The `signing_secret` is returned exactly once — on `POST /v1/listings` or a `PATCH` rotation. Subsequent reads only expose `signing_secret_preview` (last 4 chars). See [Listings](/listings#signing-secret).
 
-Call `POST /v1/orders/{id}/fulfill` to push deliverables to ListBee for any `paid` order. ListBee creates an access grant, emails the buyer, and marks the order `fulfilled`.
+You can also supply your own secret at creation time:
 
-Works on any PAID order regardless of whether the listing has deliverables. Idempotent — calling it on an already-`fulfilled` order is a no-op.
+```python
+client.listings.create(
+    name="...",
+    price=1900,
+    signing_secret="my-pre-shared-secret",   # any string, typically 32+ chars
+)
+```
+
+This enables stateless agents: bake a known secret into the worker, create the listing with that secret, verify webhooks without ever reading back ListBee state.
+
+## Retry schedule
+
+If `agent_callback_url` returns non-2xx or times out, ListBee retries with jitter:
+
+```
+attempt 1:  0s (immediate)
+attempt 2:  30s  ± 20%
+attempt 3:  5m   ± 20%
+attempt 4:  30m  ± 20%
+attempt 5:  2h   ± 20%
+attempt 6:  6h   ± 20%
+attempt 7:  24h max
+```
+
+Seven attempts spanning ~24 hours. Beyond this, the event remains queryable via [`GET /v1/events`](/events) for manual reconciliation.
+
+## Circuit breaker
+
+If a destination URL fails more than 50 times within 1 hour, ListBee opens a breaker for 15 minutes: new events still queue (nothing is dropped) but scheduling is skipped. The breaker closes automatically on the first successful delivery or when the cooldown expires.
+
+This protects your server from cascading failures during an outage and stops ListBee from hammering a dead endpoint.
+
+## Per-URL rate limiting
+
+Deliveries to the same `agent_callback_url` are token-bucket rate-limited (10 req/s). Under a sudden burst of orders, deliveries queue with small delays instead of DDoS'ing the receiver.
+
+## Redelivery
+
+Forcibly requeue events for one order:
 
 <CodeBlocks>
-  <CodeBlock title="Python">
+<CodeBlock title="Python">
 ```python
-# In your webhook or fulfillment_url handler:
-client.orders.fulfill(
-    order_id="ord_9xM4kP7nR2qT5wY1",
-    deliverables=[
-        {"type": "text", "value": "Your personalized investment report: ..."},
-    ],
-)
+ack = client.orders.redeliver(order_id="ord_9xM4kP7nR2qT5wY1")
+print(ack.scheduled_attempts)  # count of events re-queued
 ```
-  </CodeBlock>
-  <CodeBlock title="curl">
+</CodeBlock>
+<CodeBlock title="curl">
 ```bash
-curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill \
+curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/redeliver \
   -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "deliverables": [
-      {"type": "text", "value": "Your personalized investment report: ..."}
-    ]
-  }'
+  -H "Idempotency-Key: retry-2026-04-18-ord_9xM4kP7nR2qT5wY1"
 ```
-  </CodeBlock>
+</CodeBlock>
 </CodeBlocks>
 
-## Deliverables
+Sends `order.paid` (and `order.fulfilled` if applicable) with `attempt=1`, no initial backoff. Rate-limited per order (10/hour) and per API key (100/hour). If the listing has no `agent_callback_url`, `scheduled_attempts` is `0`.
 
-A deliverable is the content a buyer receives — a file, URL, or text. Attach deliverables to a listing for instant delivery, or push them via `/fulfill` for generated content. Up to 3 per listing, mixed types allowed.
+## Stateless agent pattern
 
-For types, hosting, file uploads, security, and limits — see [Deliverables](/docs/deliverables).
-
-## The stateless agent pattern
-
-`fulfillment_url` and `metadata` together enable a stateless agent: embed everything the agent needs to generate content at the time you create the listing. When `order.paid` fires, the enriched payload carries it all — no database lookups, no state management.
+Agent callback + listing metadata + order metadata make a stateless worker tractable. Encode everything the agent needs at listing-create time, and the webhook carries it on every order:
 
 ```python
-# At listing creation time — embed generation parameters in metadata
 listing = client.listings.create(
     name="Custom Market Analysis",
     price=9900,
-    fulfillment_url="https://your-agent.example.com/generate",
+    fulfillment_mode="async",
+    agent_callback_url="https://your-agent.example.com/generate",
+    signing_secret="shared-secret-the-worker-already-knows",
     metadata={
         "report_type": "market_analysis",
-        "data_sources": ["bloomberg", "sec_filings"],
+        "data_sources": "bloomberg,sec_filings",
         "output_format": "pdf",
     },
 )
 
-# At fulfillment time — your agent receives everything it needs in the payload:
-# {
-#   "listing_metadata": {"report_type": "market_analysis", ...},
-#   "checkout_data": {"ticker": "AAPL", "period": "Q1 2026"},
-#   "fulfill_url": "https://api.listbee.so/v1/orders/ord_.../fulfill"
-# }
+# When order.paid fires, the webhook payload includes:
+#   data.metadata                        → order-specific (from /fulfill, if set)
+#   data.listing.metadata                → generation parameters
+#   data.checkout_data                   → buyer-supplied fields
+#   data.id                              → order to call /fulfill on
 #
-# Generate → POST to fulfill_url → done. No state stored on your side.
+# The worker generates content → POST /v1/orders/{id}/fulfill → done.
+# No database lookup, no state on the worker's side.
 ```
 
 ## Related
 
-- [Deliverables](/docs/deliverables) — types, file uploads, security, and limits
-- [Listings](/docs/listings) — attaching deliverables and setting `fulfillment_url`
-- [Orders](/docs/orders) — order status lifecycle
-- [Webhooks](/docs/webhooks) — receiving `order.paid` to trigger fulfillment
-- [Readiness](/docs/readiness) — pre-publish checks for listings without deliverables
+- [Deliverables](/deliverables) — what `fulfill` accepts
+- [Orders](/orders) — lifecycle, refunds, redelivery
+- [Events](/events) — reconciliation feed
+- [Listings](/listings) — `fulfillment_mode`, `agent_callback_url`, `signing_secret`

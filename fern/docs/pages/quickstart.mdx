@@ -1,73 +1,78 @@
 ---
 title: Quickstart
 subtitle: Bootstrap an account and publish a listing in under 5 minutes
-covers_endpoints: [bootstrap_start, bootstrap_verify, bootstrap_complete, create_listing, add_deliverable, publish_listing]
+covers_endpoints: [bootstrap_start, bootstrap_verify, bootstrap_poll, create_listing, publish_listing, fulfill_order]
 ---
 
 ## Step 1: Create an account
 
-No console signup needed. The agent bootstraps directly via the API.
+No console signup needed. The agent bootstraps directly via the API. See [Authentication](/authentication) for the full flow.
 
 <CodeBlocks>
 <CodeBlock title="Python">
 ```python
 from listbee import ListBee
 
-# Send OTP to the owner's email
-session = ListBee.bootstrap.start(email="seller@example.com")
+bootstrapping = ListBee()
+api_key = bootstrapping.bootstrap.run(
+    "seller@example.com",
+    on_otp=lambda: input("Enter OTP from email: "),
+    on_human_action=lambda url: print(f"Complete Stripe: {url}"),
+)
 
-# Ask the human for the 6-digit code from their email
-code = input("Enter the code: ")
-
-# Verify and complete bootstrap
-ListBee.bootstrap.verify(session=session.session, code=code)
-result = ListBee.bootstrap.complete(session=session.session)
-
-api_key = result.api_key      # lb_... — save this
-account_id = result.account_id  # acc_...
+client = ListBee(api_key=api_key)
 ```
 </CodeBlock>
 <CodeBlock title="curl">
 ```bash
 # 1. Send OTP
-curl -X POST https://api.listbee.so/v1/bootstrap \
+curl -X POST https://api.listbee.so/v1/bootstrap/start \
   -H "Content-Type: application/json" \
   -d '{"email": "seller@example.com"}'
-# → {"session": "sess_...", "otp_sent": true}
+# → {"bootstrap_token": "bst_...", "account_id": "acc_...", ...}
 
-# 2. Verify (ask human for the code)
+# 2. Human pastes the 6-digit code from email
 curl -X POST https://api.listbee.so/v1/bootstrap/verify \
   -H "Content-Type: application/json" \
-  -d '{"session": "sess_...", "code": "847291"}'
+  -d '{"bootstrap_token": "bst_...", "otp_code": "123456"}'
+# → {"api_key": "lb_...", "stripe_onboarding_url": "...", ...}
 
-# 3. Complete bootstrap
-curl -X POST https://api.listbee.so/v1/bootstrap/complete \
-  -H "Content-Type: application/json" \
-  -d '{"session_id": "sess_..."}'
-# → {"object": "bootstrap", "account_id": "acc_...", "api_key": "lb_..."}
+# 3. Human opens stripe_onboarding_url, agent polls until ready
+curl https://api.listbee.so/v1/bootstrap/acc_... \
+  -H "Authorization: Bearer lb_..."
+# → {"ready": true, ...}
 ```
 </CodeBlock>
 </CodeBlocks>
 
-Use the `api_key` from the response as `Authorization: Bearer lb_...` for all subsequent requests.
+Save the `api_key` — it's shown once. Use it as `Authorization: Bearer lb_...` on every subsequent request.
 
-## Step 2: Create a listing
+## Step 2: Create and publish a listing
 
-A listing is a sellable item with a hosted product page. Required fields: `name` and `price` (in cents).
+A listing is a sellable item with a hosted product page. Required: `name` and `price` (in cents).
+
+Pick a fulfillment mode:
+
+- **`static`** — bake the deliverable into the listing. ListBee delivers it automatically at payment.
+- **`async`** — leave the deliverable empty. Your agent generates and pushes it after each order via `/fulfill`.
 
 <CodeBlocks>
 <CodeBlock title="Python">
 ```python
-client = ListBee(api_key=api_key)
+from listbee import Deliverable
 
-listing = client.listings.create(
+created = client.listings.create(
     name="SEO Playbook 2026",
-    price=1900,  # $19.00
+    price=1900,                             # $19.00
+    fulfillment_mode="static",
+    deliverable=Deliverable.url("https://example.com/seo-playbook.pdf"),
 )
 
-print(listing.id)          # lst_7kQ2xY9mN3pR5tW1vB8a
-print(listing.short_code)  # aB3xK9m
-print(listing.url)         # https://buy.listbee.so/aB3xK9m
+listing = created.listing
+signing_secret = created.signing_secret     # store this — webhook verification
+
+client.listings.publish(listing_id=listing.id)
+print(listing.url)                          # share with buyers
 ```
 </CodeBlock>
 <CodeBlock title="curl">
@@ -75,78 +80,68 @@ print(listing.url)         # https://buy.listbee.so/aB3xK9m
 curl -X POST https://api.listbee.so/v1/listings \
   -H "Authorization: Bearer lb_..." \
   -H "Content-Type: application/json" \
-  -d '{"name": "SEO Playbook 2026", "price": 1900}'
-```
-</CodeBlock>
-</CodeBlocks>
+  -d '{
+    "name": "SEO Playbook 2026",
+    "price": 1900,
+    "fulfillment_mode": "static",
+    "deliverable": {"type": "url", "value": "https://example.com/seo-playbook.pdf"}
+  }'
 
-## Step 3: Attach a deliverable and publish
-
-Attach the content buyers receive after paying — a URL, file, or text. Then publish.
-
-<CodeBlocks>
-<CodeBlock title="Python">
-```python
-# Attach a deliverable
-client.listings.add_deliverable(
-    listing_id=listing.id,
-    type="url",
-    value="https://example.com/seo-playbook-download",
-)
-
-# Publish — product page goes live immediately
-published = client.listings.publish(listing_id=listing.id)
-print(published.status)  # published
-print(published.url)     # share this with buyers
-```
-</CodeBlock>
-<CodeBlock title="curl">
-```bash
-# Attach a deliverable
-curl -X POST https://api.listbee.so/v1/listings/lst_.../deliverables \
-  -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{"type": "url", "value": "https://example.com/seo-playbook-download"}'
-
-# Publish
+# Then publish:
 curl -X POST https://api.listbee.so/v1/listings/lst_.../publish \
   -H "Authorization: Bearer lb_..."
 ```
 </CodeBlock>
 </CodeBlocks>
 
-The product page is live. If Stripe is not connected yet, the page renders but the buy button is disabled — it shows "Coming soon" until the human connects Stripe.
+`signing_secret` is the HMAC key for webhook payloads on this listing. It's returned once at creation — store it now. See [Fulfillment](/fulfillment) for webhook signing.
 
-## Step 4: Connect Stripe (when ready to sell)
+## Step 3: Handle orders
 
-Check account readiness to see what's needed:
+When a buyer pays, ListBee creates an order (`status: paid`) and fires `order.paid`. For `static` listings, ListBee also delivers the pre-baked `deliverable`, transitions the order to `fulfilled`, and fires `order.fulfilled`.
+
+For `async` listings, your agent generates content after payment and pushes it back:
 
 <CodeBlocks>
 <CodeBlock title="Python">
 ```python
-account = client.account.get()
-if not account.readiness.sellable:
-    # Present the Stripe URL to the human
-    action = account.readiness.actions[0]
-    print(f"Connect Stripe: {action.resolve.url}")
+from listbee import Deliverable
+
+# In your order.paid handler:
+client.orders.fulfill(
+    order_id="ord_9xM4kP7nR2qT5wY1",
+    deliverable=Deliverable.text("Your personalized report: ..."),
+)
 ```
 </CodeBlock>
 <CodeBlock title="curl">
 ```bash
-curl https://api.listbee.so/v1/account \
-  -H "Authorization: Bearer lb_..."
+curl -X POST https://api.listbee.so/v1/orders/ord_9xM4kP7nR2qT5wY1/fulfill \
+  -H "Authorization: Bearer lb_..." \
+  -H "Content-Type: application/json" \
+  -d '{"deliverable": {"type": "text", "value": "Your personalized report: ..."}}'
 ```
 </CodeBlock>
 </CodeBlocks>
 
-The human opens the Stripe Connect URL, completes onboarding (5 minutes), and the listing's buy button activates automatically.
+ListBee emails the buyer a permanent `unlock_url` and transitions the order to `fulfilled`.
 
-## What happens next
+## Step 4: Receive webhooks
 
-When a buyer visits the product page and pays:
-1. ListBee creates a Stripe Checkout session on the seller's connected account
-2. After payment, the order is created with status `paid`
-3. If the listing has deliverables, ListBee auto-delivers and emails the buyer
-4. `order.paid` and `order.fulfilled` webhook events fire
+Pass `agent_callback_url` on the listing to have ListBee POST events to your server. Events are signed with the listing's `signing_secret` (HMAC-SHA256).
 
-Set up a [webhook](/webhooks) to get notified of orders programmatically.
+```python
+client.listings.update(
+    listing_id=listing.id,
+    agent_callback_url="https://your-agent.example.com/hooks/listbee",
+)
+```
+
+No URL? You can still poll `GET /v1/orders` or `GET /v1/events` for a reconciliation pass. See [Events](/events) and [Fulfillment](/fulfillment).
+
+## Next steps
+
+- [Listings](/listings) — fulfillment modes, metadata, checkout schema
+- [Orders](/orders) — lifecycle, unlock URLs, redelivery
+- [Fulfillment](/fulfillment) — webhook signing, retry schedule
+- [Readiness](/readiness) — what's blocking an account or listing

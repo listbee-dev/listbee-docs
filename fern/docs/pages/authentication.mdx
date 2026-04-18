@@ -1,21 +1,27 @@
 ---
 title: Authentication
-subtitle: Bootstrap an account and get an API key in three steps — no console required
-covers_endpoints: [bootstrap_start, bootstrap_verify, bootstrap_complete]
+subtitle: Bootstrap an account and get an API key without opening a browser
+covers_endpoints: [bootstrap_start, bootstrap_verify, bootstrap_poll, api_key_self_revoke]
 ---
 
-All ListBee API requests authenticate with an API key passed as a Bearer token. Keys have the prefix `lb_` and are tied to an account.
+All ListBee API requests authenticate with an API key passed as a Bearer token. Keys start with `lb_` and are tied to one account.
+
+```
+Authorization: Bearer lb_...
+```
+
+Missing or invalid keys return `401`.
 
 ## Two ways to get a key
 
-1. **Bootstrap API** (agent-driven) — the agent creates an account and gets a key via 3 API calls. A human provides their email and an OTP code.
-2. **Console** (human-driven) — sign in at [console.listbee.so](https://console.listbee.so). An account and key are created on first login.
+1. **Bootstrap API** (agent-driven) — the agent creates an account, a human pastes a 6-digit OTP, the agent gets a key. No console visit required.
+2. **Console** (human-driven) — sign in at [console.listbee.so](https://console.listbee.so), create keys in the API Keys page.
 
-Both paths produce the same result: an account with an API key.
+Both paths produce the same account. If an account already exists for that email, bootstrap reuses it.
 
 ## Bootstrap flow
 
-Three steps, one focus each. The agent drives the flow, the human verifies their email.
+Two API calls plus a poll. The agent drives; the human hands over one 6-digit code and completes Stripe Connect in a browser.
 
 ### Step 1: Send OTP
 
@@ -25,14 +31,13 @@ Three steps, one focus each. The agent drives the flow, the human verifies their
 from listbee import ListBee
 
 client = ListBee()  # no api_key needed for bootstrap
-result = client.bootstrap.start(email="seller@example.com")
-session = result.session
-# Ask the human: "Check your email for a 6-digit code"
+start = client.bootstrap.start(email="seller@example.com")
+# Tell the human: check your email for a 6-digit code.
 ```
 </CodeBlock>
 <CodeBlock title="curl">
 ```bash
-curl -X POST https://api.listbee.so/v1/bootstrap \
+curl -X POST https://api.listbee.so/v1/bootstrap/start \
   -H "Content-Type: application/json" \
   -d '{"email": "seller@example.com"}'
 ```
@@ -44,47 +49,34 @@ Response:
 ```json
 {
   "object": "bootstrap_session",
-  "session": "sess_abc123...",
-  "otp_sent": true
+  "bootstrap_token": "bst_abc123",
+  "account_id": "acc_01J3K4M5N6P7Q8R9S0T1U2V3W4",
+  "otp_expires_at": "2026-04-17T12:10:00Z"
 }
 ```
 
-### Step 2: Verify OTP
+The `bootstrap_token` is single-use and expires in 10 minutes. The `account_id` is stable — you can start polling it immediately.
 
-The human reads the 6-digit code from their email. The agent passes it back.
+### Step 2: Verify and collect the key
+
+The human reads the 6-digit code from their email and pastes it back. The agent submits it with the `bootstrap_token`.
 
 <CodeBlocks>
 <CodeBlock title="Python">
 ```python
-result = client.bootstrap.verify(session=session, code="847291")
+result = client.bootstrap.verify(
+    bootstrap_token=start.bootstrap_token,
+    otp_code="123456",
+)
+api_key = result.api_key                        # lb_... — save immediately, not shown again
+onboarding_url = result.stripe_onboarding_url   # hand to the human
 ```
 </CodeBlock>
 <CodeBlock title="curl">
 ```bash
 curl -X POST https://api.listbee.so/v1/bootstrap/verify \
   -H "Content-Type: application/json" \
-  -d '{"session": "sess_abc123...", "code": "847291"}'
-```
-</CodeBlock>
-</CodeBlocks>
-
-If the email is new, an account is created. If it already exists, the existing account is returned. The agent doesn't need to know which case occurred.
-
-### Step 3: Complete bootstrap
-
-<CodeBlocks>
-<CodeBlock title="Python">
-```python
-result = client.bootstrap.complete(session=session)
-api_key = result.api_key  # lb_... — shown once, save it
-account_id = result.account_id  # acc_...
-```
-</CodeBlock>
-<CodeBlock title="curl">
-```bash
-curl -X POST https://api.listbee.so/v1/bootstrap/complete \
-  -H "Content-Type: application/json" \
-  -d '{"session_id": "sess_abc123..."}'
+  -d '{"bootstrap_token": "bst_abc123", "otp_code": "123456"}'
 ```
 </CodeBlock>
 </CodeBlocks>
@@ -93,33 +85,96 @@ Response:
 
 ```json
 {
-  "object": "bootstrap",
-  "account_id": "acc_7kQ2xY9mN3pR5tW1vB8a",
-  "api_key": "lb_abc123..."
+  "object": "bootstrap_result",
+  "account_id": "acc_01J3K4M5N6P7Q8R9S0T1U2V3W4",
+  "api_key": "lb_01J3K4M5N6P7Q8R9S0T1U2V3W4X5Y6Z7",
+  "stripe_onboarding_url": "https://connect.stripe.com/setup/s/...",
+  "readiness": {
+    "operational": false,
+    "actions": [
+      {
+        "code": "stripe_connect_required",
+        "kind": "human",
+        "priority": "required",
+        "message": "Complete Stripe Connect onboarding to accept payments.",
+        "resolve": {"method": "redirect", "url": "https://connect.stripe.com/setup/s/..."}
+      }
+    ],
+    "next": "stripe_connect_required"
+  }
 }
 ```
 
-The `api_key` is returned once. Save it and use it as `Authorization: Bearer lb_...` for all subsequent requests.
+The API key is returned once. Listings can already be created and published — payment collection unlocks once Stripe Connect completes.
 
-## Using a key
+### Step 3: Poll until Stripe is connected
 
+Hand `stripe_onboarding_url` to the human. While they complete onboarding in a browser, the agent polls:
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+import time
+
+while True:
+    status = client.bootstrap.poll(result.account_id)
+    if status.ready:
+        break
+    time.sleep(5)
 ```
-Authorization: Bearer lb_...
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl https://api.listbee.so/v1/bootstrap/acc_01J3K4M5N6P7Q8R9S0T1U2V3W4 \
+  -H "Authorization: Bearer lb_..."
+```
+</CodeBlock>
+</CodeBlocks>
+
+`ready: true` means `readiness.operational` is `true` — the account can accept payments.
+
+### One-liner helper
+
+The Python and TypeScript SDKs bundle the full flow in `bootstrap.run()`:
+
+```python
+api_key = client.bootstrap.run(
+    "seller@example.com",
+    on_otp=lambda: input("Enter OTP: "),
+    on_human_action=lambda url: print(f"Visit: {url}"),
+)
 ```
 
-Each key belongs to one account. All operations through that key are scoped to that account's listings, orders, and webhooks.
+`run()` calls `start`, prompts for the OTP via `on_otp`, calls `verify`, hands the Stripe URL to `on_human_action`, and polls until the account is ready. It returns the API key.
 
-Missing or invalid keys return `401`.
+## Revoking a key
 
-## Same email, existing account
+An agent can destroy its own key without a human in the loop — useful if the key is leaked or the host is compromised.
 
-Bootstrapping with an email that already has an account returns the existing account. If Stripe was already connected, the account is immediately sellable.
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+client.api_keys.self_revoke()
+# The calling key is dead the moment this returns.
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/api-keys/self-revoke \
+  -H "Authorization: Bearer lb_..."
+```
+</CodeBlock>
+</CodeBlocks>
 
-## Key rotation
+`POST /v1/api-keys/self-revoke` revokes the key used to authenticate the call. It cannot list, read, or touch any other key on the account. Multi-key management (list, create, revoke a different key) is console-only at [console.listbee.so](https://console.listbee.so).
 
-Keys can be rotated in the [console](https://console.listbee.so). The old key is immediately invalidated. The account ID stays the same.
+## Threat model for the OTP-over-chat handoff
+
+The bootstrap flow deliberately funnels the OTP code through the human's chat with the agent: the agent reads it, and that's required — it submits it to `/verify`. The code is short-TTL (10 min), single-use, and scoped to ListBee via the paired `bootstrap_token`. Agents should not persist or log the OTP after verify succeeds.
+
+If this model doesn't fit, the human can bootstrap through the console and hand the agent a key manually.
 
 ## Related
 
-- [Quickstart](/quickstart) — bootstrap to first listing in 5 minutes
-- [Readiness](/readiness) — what readiness tells you about account and listing state
+- [Quickstart](/quickstart) — bootstrap to first listing in under 5 minutes
+- [Readiness](/readiness) — what the `actions` array tells your agent to do next

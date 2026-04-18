@@ -1,62 +1,59 @@
 ---
 title: Listings
-subtitle: Create and manage sellable items with hosted product pages
-covers_endpoints: [create_listing, get_listing, list_listings, update_listing, delete_listing, publish_listing, set_deliverables, remove_deliverables]
+subtitle: Sellable items with hosted product pages and per-listing webhooks
+covers_endpoints: [create_listing, get_listing, list_listings, update_listing, delete_listing, publish_listing, unpublish_listing, archive_listing]
 ---
 
-A listing is a sellable item. It has a price and a hosted product page buyers visit to pay. Creating a listing returns a URL you share with buyers. When a buyer pays, ListBee delivers content automatically if the listing has deliverables — otherwise it fires a webhook for your system to handle.
+A listing is a sellable item. It has a price, a fulfillment mode, and a hosted product page buyers visit to pay. Creating a listing returns a shareable URL and a one-time `signing_secret` for webhook signature verification.
 
-## How it works
+## Lifecycle
 
-Listings start in `draft` status. In draft, all fields are editable and the listing is not yet visible to buyers. When you're ready, call `publish` — the listing goes live, the product page becomes accessible, and orders can be placed.
+```
+created  →  DRAFT  ⇄  PUBLISHED  →  ARCHIVED
+```
 
-The product page at `url` (e.g. `https://buy.listbee.so/aB3xK9m`) shows the listing name, description, price, and cover image. Buyers click the buy button and pay via Stripe Checkout. What happens after payment depends on whether the listing has deliverables attached — see [Fulfillment](/docs/fulfillment).
+- **`draft`** — editable, not visible to buyers
+- **`published`** — live on the product page URL, orders can be placed
+- **`archived`** — terminal, no longer visible, cannot be published again
 
-Each listing must pass a readiness check before it can be published. `readiness.sellable` indicates whether a buyer can currently complete a purchase. If `false`, `readiness.actions` lists what's needed. See [Readiness](/docs/readiness).
+Transitions: `/publish`, `/unpublish` (back to draft — agent's "pause"), `/archive` (terminal).
+
+Whether a published listing is actually buyable also depends on account readiness (Stripe Connect, charges enabled). See [Readiness](/readiness).
+
+## Fulfillment modes
+
+Set at creation, mutable via PATCH:
+
+- **`static`** — bake the deliverable into the listing. ListBee delivers it at `order.paid` and transitions the order to `fulfilled`.
+- **`async`** — no deliverable on the listing. After each order, the agent pushes content via `POST /v1/orders/{id}/fulfill`.
 
 ## Creating a listing
 
-The two required fields are `name` and `price` (in cents).
+Required fields: `name` and `price`. Everything else is optional.
 
 <CodeBlocks>
-  <CodeBlock title="Python">
+<CodeBlock title="Python">
 ```python
-from listbee import ListBee
+from listbee import ListBee, Deliverable
 
 client = ListBee(api_key="lb_...")
 
-listing = client.listings.create(
+created = client.listings.create(
     name="SEO Playbook 2026",
-    price=1900,             # $19.00
+    price=1900,                             # cents
+    fulfillment_mode="static",
+    deliverable=Deliverable.url("https://example.com/seo-playbook.pdf"),
     description="A comprehensive guide to modern SEO techniques.",
     tagline="Updated for 2026 algorithm changes",
+    agent_callback_url="https://your-agent.example.com/hooks/listbee",
+    metadata={"campaign": "spring-launch"},
 )
 
-print(listing.id)              # lst_7kQ2xY9mN3pR5tW1vB8a
-print(listing.status)          # draft
-print(listing.short_code)      # aB3xK9m
-print(listing.url)             # https://buy.listbee.so/aB3xK9m
-print(listing.has_deliverables) # False
+listing = created.listing
+signing_secret = created.signing_secret     # shown once — store immediately
 ```
-  </CodeBlock>
-  <CodeBlock title="TypeScript">
-```typescript
-import { ListBee } from 'listbee';
-
-const client = new ListBee({ apiKey: 'lb_...' });
-
-const listing = await client.listings.create({
-  name: 'SEO Playbook 2026',
-  price: 1900,
-  description: 'A comprehensive guide to modern SEO techniques.',
-  tagline: 'Updated for 2026 algorithm changes',
-});
-
-console.log(listing.id);              // lst_7kQ2xY9mN3pR5tW1vB8a
-console.log(listing.hasDeliverables); // false
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
+</CodeBlock>
+<CodeBlock title="curl">
 ```bash
 curl -X POST https://api.listbee.so/v1/listings \
   -H "Authorization: Bearer lb_..." \
@@ -64,190 +61,154 @@ curl -X POST https://api.listbee.so/v1/listings \
   -d '{
     "name": "SEO Playbook 2026",
     "price": 1900,
+    "fulfillment_mode": "static",
+    "deliverable": {"type": "url", "value": "https://example.com/seo-playbook.pdf"},
     "description": "A comprehensive guide to modern SEO techniques.",
-    "tagline": "Updated for 2026 algorithm changes"
+    "tagline": "Updated for 2026 algorithm changes",
+    "agent_callback_url": "https://your-agent.example.com/hooks/listbee",
+    "metadata": {"campaign": "spring-launch"}
   }'
 ```
-  </CodeBlock>
+</CodeBlock>
 </CodeBlocks>
 
-To use a per-listing callback for agent-driven fulfillment, pass `fulfillment_url`. ListBee POSTs an enriched payload to this URL on each purchase. You can change `fulfillment_url` anytime, including after publishing.
+The response wraps the listing and the one-time signing secret:
 
-<CodeBlocks>
-  <CodeBlock title="Python">
+```json
+{
+  "object": "listing_with_secret",
+  "listing": { "object": "listing", "id": "lst_...", "status": "draft", ... },
+  "signing_secret": "Xk9mN2pR5tW1vB8aQ4nL7xY0zJ3eF6cH"
+}
+```
+
+Subsequent reads only expose `signing_secret_preview` (last 4 chars).
+
+## Signing secret
+
+Each listing has a per-listing HMAC key used to sign webhook payloads to `agent_callback_url`. See [Fulfillment](/fulfillment#verifying-signatures) for verification.
+
+Supply your own on create:
+
 ```python
-listing = client.listings.create(
-    name="Personalized Market Report",
-    price=4900,
-    fulfillment_url="https://your-agent.example.com/hooks/listbee",
-    metadata={"report_type": "market_analysis"},
+client.listings.create(
+    name="...",
+    price=1900,
+    signing_secret="my-pre-shared-secret-agents-already-know",
 )
 ```
-  </CodeBlock>
-  <CodeBlock title="TypeScript">
-```typescript
-const listing = await client.listings.create({
-  name: 'Personalized Market Report',
-  price: 4900,
-  fulfillmentUrl: 'https://your-agent.example.com/hooks/listbee',
-  metadata: { reportType: 'market_analysis' },
-});
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
-```bash
-curl -X POST https://api.listbee.so/v1/listings \
-  -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Personalized Market Report",
-    "price": 4900,
-    "fulfillment_url": "https://your-agent.example.com/hooks/listbee",
-    "metadata": {"report_type": "market_analysis"}
-  }'
-```
-  </CodeBlock>
-</CodeBlocks>
 
-## Attaching deliverables
+Or rotate via PATCH:
 
-Attach content that buyers receive after payment. Any draft listing can have deliverables. If deliverables are attached, ListBee auto-delivers on payment.
-
-<CodeBlocks>
-  <CodeBlock title="Python">
 ```python
-from listbee import Deliverable
+# Pass a new value, or null to auto-generate
+client.listings.update(listing_id=listing.id, signing_secret=None)
+# response: RotateSigningSecretResponse with the full new secret (shown once)
+```
 
-client.listings.set_deliverables(
-    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
-    deliverables=[Deliverable.file("ebook.pdf")],
+Rotation invalidates the old secret immediately — there's no grace window.
+
+## Agent callback URL
+
+Set `agent_callback_url` to receive `order.paid`, `order.fulfilled`, `order.refunded`, and `order.disputed` events for this listing, signed with `signing_secret`.
+
+```python
+client.listings.update(
+    listing_id=listing.id,
+    agent_callback_url="https://your-agent.example.com/hooks/listbee",
 )
 ```
-  </CodeBlock>
-  <CodeBlock title="TypeScript">
-```typescript
-import { Deliverable } from 'listbee';
 
-await client.listings.setDeliverables('lst_7kQ2xY9mN3pR5tW1vB8a', {
-  deliverables: [Deliverable.file('ebook.pdf')],
-});
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
-```bash
-curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/deliverables \
-  -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{"deliverables": [{"type": "file", "token": "file_7kQ2xY9mN3pR5tW1vB8a01"}]}'
-```
-  </CodeBlock>
-</CodeBlocks>
+Leave it null to rely on polling `/v1/orders` or `/v1/events` instead. See [Events](/events) and [Fulfillment](/fulfillment).
 
-Three types: `file`, `url`, and `text`. The `Deliverable` builder handles file uploads automatically. For the full reference on types, hosting, security, and limits — see [Deliverables](/docs/deliverables).
+## Metadata
 
-## Publishing
+`metadata` is a free-form dict that rides with the listing into order snapshots and webhook payloads. Use it to carry generation parameters or correlation keys your agent needs, without shadow state.
 
-Once Stripe is connected — and the listing has deliverables or a fulfillment path — publish the listing:
+Stripe-aligned limits: max 50 keys, keys ≤ 40 chars, values must be strings ≤ 500 chars, no nested objects.
 
-<CodeBlocks>
-  <CodeBlock title="Python">
 ```python
-published = client.listings.publish(listing_id="lst_7kQ2xY9mN3pR5tW1vB8a")
-
-print(published.status)                # published
-print(published.readiness.sellable)    # True
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
-```bash
-curl -X POST https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a/publish \
-  -H "Authorization: Bearer lb_..."
-```
-  </CodeBlock>
-</CodeBlocks>
-
-Publishing fails with `409` if `readiness.sellable` is `false`. Check `readiness.actions` to see what's blocking. A listing without deliverables can still be published — the readiness check accounts for webhook-based fulfillment paths.
-
-## Updating a listing
-
-Partial updates — only provided fields change. All fields, including `fulfillment_url`, can be changed at any time.
-
-<CodeBlocks>
-  <CodeBlock title="Python">
-```python
-listing = client.listings.update(
-    listing_id="lst_7kQ2xY9mN3pR5tW1vB8a",
-    price=2500,
-    tagline="Now with bonus templates",
+client.listings.create(
+    name="Custom Market Analysis",
+    price=9900,
+    fulfillment_mode="async",
+    agent_callback_url="https://your-agent.example.com/generate",
+    metadata={
+        "report_type": "market_analysis",
+        "data_sources": "bloomberg,sec_filings",
+        "output_format": "pdf",
+    },
 )
 ```
-  </CodeBlock>
-  <CodeBlock title="curl">
-```bash
-curl -X PUT https://api.listbee.so/v1/listings/lst_7kQ2xY9mN3pR5tW1vB8a \
-  -H "Authorization: Bearer lb_..." \
-  -H "Content-Type: application/json" \
-  -d '{"price": 2500, "tagline": "Now with bonus templates"}'
-```
-  </CodeBlock>
-</CodeBlocks>
-
-## Listing all listings
-
-<CodeBlocks>
-  <CodeBlock title="Python">
-```python
-result = client.listings.list()
-
-for listing in result.data:
-    print(listing.id, listing.name, listing.status)
-
-# Next page
-if result.has_more:
-    next_page = client.listings.list(cursor=result.cursor)
-```
-  </CodeBlock>
-  <CodeBlock title="curl">
-```bash
-curl "https://api.listbee.so/v1/listings" \
-  -H "Authorization: Bearer lb_..."
-```
-  </CodeBlock>
-</CodeBlocks>
-
-## Key fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Unique listing ID (`lst_` prefixed) |
-| `name` | string | Product name shown on the product page |
-| `short_code` | string | 7-character base62 identifier used in the product page URL |
-| `price` | integer | Price in cents — `1900` = $19.00 |
-| `status` | string | `draft` or `published` |
-| `has_deliverables` | boolean | Whether this listing has deliverables attached |
-| `fulfillment_url` | string | Per-listing callback URL; ListBee POSTs enriched payload on purchase |
-| `url` | string | Product page URL — share this with buyers |
-| `embed_url` | string | Embeddable product page URL for iframes |
-| `deliverables` | array | Content attached to this listing |
-| `checkout_schema` | array | Custom fields collected from the buyer at checkout |
-| `stock` | integer | `null` = unlimited; `0` = out of stock; positive = remaining units |
-| `compare_at_price` | integer | Strikethrough price in cents |
-| `metadata` | object | Arbitrary key-value pairs; included in `fulfillment_url` callbacks |
-| `readiness` | object | Whether the listing is sellable and what actions are needed |
-| `readiness.sellable` | boolean | `true` when buyers can complete a purchase |
 
 ## State transitions
 
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+client.listings.publish(listing_id=listing.id)     # draft → published
+client.listings.unpublish(listing_id=listing.id)   # published → draft
+client.listings.archive(listing_id=listing.id)     # → archived (terminal)
 ```
-draft → published   (via POST /v1/listings/{id}/publish)
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl -X POST https://api.listbee.so/v1/listings/lst_.../publish    -H "Authorization: Bearer lb_..."
+curl -X POST https://api.listbee.so/v1/listings/lst_.../unpublish  -H "Authorization: Bearer lb_..."
+curl -X POST https://api.listbee.so/v1/listings/lst_.../archive    -H "Authorization: Bearer lb_..."
+```
+</CodeBlock>
+</CodeBlocks>
+
+`publish` returns `409` with a readiness payload if the listing isn't sellable (e.g. `static` mode with no deliverable). Check `readiness.actions` to see what's blocking.
+
+## Updating
+
+Partial updates — only provided fields change.
+
+```python
+client.listings.update(
+    listing_id=listing.id,
+    price=2500,
+    tagline="Now with bonus templates",
+    deliverable=Deliverable.url("https://example.com/seo-playbook-v2.pdf"),
+)
 ```
 
-Published listings cannot be unpublished. Delete and recreate if needed.
+All fields including `fulfillment_mode`, `deliverable`, `agent_callback_url`, `metadata` are mutable at any time.
+
+## Listing all listings
+
+```python
+result = client.listings.list()
+for listing in result.data:
+    print(listing.id, listing.name, listing.status)
+
+if result.has_more:
+    next_page = client.listings.list(cursor=result.cursor)
+```
+
+## Key fields
+
+| Field                   | Type    | Description |
+|-------------------------|---------|-------------|
+| `id`                    | string  | Unique listing ID (`lst_`) |
+| `status`                | string  | `draft`, `published`, or `archived` |
+| `fulfillment_mode`      | string  | `static` or `async` |
+| `deliverable`           | object  | Pre-baked deliverable (static mode only), `null` otherwise |
+| `agent_callback_url`    | string  | Per-listing webhook URL; `null` to disable |
+| `signing_secret_preview`| string  | Last 4 chars of the signing secret (full value only at create/rotate) |
+| `metadata`              | object  | Forwarded in webhook payloads |
+| `price`                 | integer | Cents — `1900` = $19.00 |
+| `checkout_schema`       | array   | Custom fields collected at checkout |
+| `short_code`            | string  | Identifier in the product page URL |
+| `url`                   | string  | Product page URL |
+| `readiness`             | object  | `sellable` flag + `actions` when not sellable |
 
 ## Related
 
-- [Deliverables](/docs/deliverables) — types, file uploads, security, and limits
-- [Fulfillment](/docs/fulfillment) — how deliverables determine delivery behavior
-- [Readiness](/docs/readiness) — how to interpret and resolve readiness actions
-- [Orders](/docs/orders) — what happens after a buyer pays
-- [Checkout schema](/docs/checkout-schema) — custom buyer fields at checkout
+- [Deliverables](/deliverables) — URL vs text, SDK builders
+- [Fulfillment](/fulfillment) — webhook signing, retries, circuit breaker
+- [Orders](/orders) — what happens after a buyer pays
+- [Readiness](/readiness) — resolving publish blockers
+- [Checkout schema](/checkout-schema) — custom buyer fields at checkout

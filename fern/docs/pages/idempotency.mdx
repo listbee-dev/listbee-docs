@@ -1,7 +1,7 @@
 ---
 title: Idempotency
 subtitle: Make POST requests safe to retry
-covers_endpoints: [create_listing, create_webhook]
+covers_endpoints: [create_listing, fulfill_order, redeliver_order]
 ---
 
 All POST endpoints accept an `Idempotency-Key` header. Sending the same key within 24 hours returns the original cached response instead of executing the request again.
@@ -27,7 +27,7 @@ client = ListBee(api_key="lb_...")
 idempotency_key = str(uuid.uuid4())  # e.g. "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 
 listing = client.listings.create(
-    title="Advanced Python course",
+    name="Advanced Python course",
     price=9900,
     headers={"Idempotency-Key": idempotency_key},
 )
@@ -40,7 +40,7 @@ curl -X POST https://api.listbee.so/v1/listings \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: f47ac10b-58cc-4372-a567-0e02b2c3d479" \
   -d '{
-    "title": "Advanced Python course",
+    "name": "Advanced Python course",
     "price": 9900
   }'
 ```
@@ -65,7 +65,7 @@ idempotency_key = str(uuid.uuid4())
 for attempt in range(3):
     try:
         listing = client.listings.create(
-            title="Advanced Python course",
+            name="Advanced Python course",
             price=9900,
             headers={"Idempotency-Key": idempotency_key},
         )
@@ -85,14 +85,14 @@ curl -X POST https://api.listbee.so/v1/listings \
   -H "Authorization: Bearer lb_..." \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: f47ac10b-58cc-4372-a567-0e02b2c3d479" \
-  -d '{"title": "Advanced Python course", "price": 9900}'
+  -d '{"name": "Advanced Python course", "price": 9900}'
 
 # Retry with the same key — safe:
 curl -X POST https://api.listbee.so/v1/listings \
   -H "Authorization: Bearer lb_..." \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: f47ac10b-58cc-4372-a567-0e02b2c3d479" \
-  -d '{"title": "Advanced Python course", "price": 9900}'
+  -d '{"name": "Advanced Python course", "price": 9900}'
 ```
 </CodeBlock>
 </CodeBlocks>

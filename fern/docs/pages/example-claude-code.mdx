@@ -1,66 +1,50 @@
 ---
 title: Sell from Claude Code
-subtitle: Create a listing, upload a file, attach it as a deliverable, and publish — all from a Python script.
-covers_endpoints: [create_listing, upload_file, add_deliverable, publish_listing]
+subtitle: Create a listing with a pre-baked deliverable and publish — from a Python script.
+covers_endpoints: [create_listing, publish_listing]
 ---
 
-A user says "sell my ebook for $19." The agent needs to create a listing, upload the file, attach it as a deliverable, and publish — four API calls in sequence.
+A user says "sell my ebook for $19." The agent hosts the file somewhere (S3, Drive, its own server), creates a ListBee listing pointing at it, and publishes. Two API calls.
 
 ## Full script
 
 ```python
 import os
-from listbee import ListBee
+from listbee import ListBee, Deliverable
 
 client = ListBee(api_key=os.environ["LISTBEE_API_KEY"])
 
-# 1. Create a draft listing
-listing = client.listings.create(
+# 1. Create a published static listing with the deliverable baked in
+created = client.listings.create(
     name="Python Automation Handbook",
-    price=1900,                # $19.00
+    price=1900,                                  # $19.00
     description="A practical guide to automating repetitive tasks with Python.",
+    fulfillment_mode="static",
+    deliverable=Deliverable.url("https://cdn.example.com/handbooks/python-automation.pdf"),
 )
 
-print(f"Listing created: {listing.id}")
-print(f"Status: {listing.status}")           # draft
-print(f"Sellable: {listing.readiness.sellable}")  # False — no deliverable yet
+listing = created.listing
+signing_secret = created.signing_secret          # store this — webhook HMAC key
 
-# 2. Upload the file
-with open("handbook.pdf", "rb") as f:
-    file = client.files.upload(file=f, filename="handbook.pdf")
+print(f"Listing created: {listing.id} (status={listing.status})")
 
-print(f"File uploaded: {file.token}")
-
-# 3. Attach the file as a deliverable
-client.listings.add_deliverable(
-    listing_id=listing.id,
-    type="file",
-    token=file.token,
-)
-
-print("Deliverable attached")
-
-# 4. Publish the listing
+# 2. Publish
 published = client.listings.publish(listing_id=listing.id)
 
-print(f"Status: {published.status}")         # published
-print(f"Product page: {published.url}")      # https://buy.listbee.so/pY2xK8m
-print(f"Sellable: {published.readiness.sellable}")  # True
+print(f"Status: {published.status}")             # published
+print(f"Product page: {published.url}")          # https://buy.listbee.so/pY2xK8m
+print(f"Sellable: {published.readiness.sellable}")  # True, once Stripe is connected
 ```
 
 ## What happens
 
-**Step 1 — Create listing.** The listing is created in `draft` status. The `readiness` object in the response includes a `configure_fulfillment` action pointing to the next call.
+**Step 1 — Create.** The listing is created in `draft` status with `fulfillment_mode=static` and a URL deliverable. The response wraps the listing and a one-time `signing_secret` for webhook verification.
 
-**Step 2 — Upload file.** `POST /v1/files` uploads the file to CDN and returns a `token`. The token is a reference — it doesn't contain the file content.
+**Step 2 — Publish.** `POST /v1/listings/{id}/publish` moves the listing to `published`. The product page is immediately live. If the account has Stripe Connect set up, the buy button is active; if not, the page renders with a disabled button until onboarding completes (see [Readiness](/readiness)).
 
-**Step 3 — Attach deliverable.** `POST /v1/listings/{id}/deliverables` links the uploaded file to the listing. Buyers receive a signed download link valid for 48 hours and up to 10 downloads after payment.
-
-**Step 4 — Publish.** `POST /v1/listings/{id}/publish` makes the listing live. The product page is immediately accessible. `readiness.sellable` becomes `true`.
+When a buyer pays, ListBee auto-delivers the URL — the buyer is redirected to it from the unlock page. No extra agent code runs.
 
 ## Reading the readiness object
-
-After step 1, the response looks like:
 
 ```json
 {
@@ -71,48 +55,44 @@ After step 1, the response looks like:
     "sellable": false,
     "actions": [
       {
-        "code": "configure_fulfillment",
+        "code": "listing_unpublished",
         "kind": "api",
-        "message": "Attach a deliverable so buyers receive content after payment.",
-        "resolve": {
-          "method": "POST",
-          "endpoint": "/v1/listings/lst_abc123/deliverables",
-          "params": null
-        }
+        "priority": "required",
+        "message": "Publish the listing to make it buyable.",
+        "resolve": {"method": "POST", "endpoint": "/v1/listings/lst_abc123/publish"}
       }
     ],
-    "next": "configure_fulfillment"
+    "next": "listing_unpublished"
   }
 }
 ```
 
-`readiness.next` is the action code the agent should resolve first. After attaching a deliverable, `next` becomes `not_published`. After publishing, `next` becomes `null` and `sellable` becomes `true`.
-
-Agents can follow this chain without any hardcoded logic about what comes next.
+`readiness.next` points to the single highest-priority action. Agents resolve it, refetch, and the list converges to `sellable: true`.
 
 ## Variations
 
-**URL deliverable instead of file upload** — skip steps 2 and 3, use `type="url"` with a `value`:
+**Text deliverable** — deliver a license key or block of Markdown:
 
 ```python
-client.listings.add_deliverable(
-    listing_id=listing.id,
-    type="url",
-    value="https://example.com/download/handbook",
+client.listings.create(
+    name="Premium License",
+    price=4900,
+    fulfillment_mode="static",
+    deliverable=Deliverable.text("Your license key: XXXX-XXXX-XXXX-XXXX"),
 )
 ```
 
-**Text deliverable** — deliver a license key, access code, or any short text:
+**AI-generated content per order** — use `fulfillment_mode=async` with an `agent_callback_url`. On `order.paid`, your server generates content and calls `POST /v1/orders/{id}/fulfill` to push it. See [Fulfillment](/fulfillment).
 
 ```python
-client.listings.add_deliverable(
-    listing_id=listing.id,
-    type="text",
-    value="Your license key: XXXX-XXXX-XXXX-XXXX",
+client.listings.create(
+    name="Personalized Market Report",
+    price=9900,
+    fulfillment_mode="async",
+    agent_callback_url="https://your-agent.example.com/hooks/listbee",
+    metadata={"report_type": "market_analysis"},
 )
 ```
-
-**AI-generated content** — skip deliverables and set a `fulfillment_url` on the listing. ListBee fires your callback on purchase. Call `/fulfill` to deliver the generated content. See [Fulfillment](/fulfillment) for details.
 
 ## Related
 

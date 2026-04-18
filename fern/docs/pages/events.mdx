@@ -1,0 +1,119 @@
+---
+title: Events
+subtitle: Cursor-paginated event log for reconciliation and missed webhooks
+covers_endpoints: [list_events]
+---
+
+Every domain event ListBee emits is persisted and queryable via `GET /v1/events`. Use it to reconcile orders when your webhook endpoint was down, to bootstrap a worker against historical activity, or as a polling-primary delivery channel when you don't want to expose a public callback.
+
+Events outlive webhook delivery — even if `agent_callback_url` failed all 7 retries, the event is still here.
+
+## Event types
+
+| Type              | Fires when                                    |
+|-------------------|-----------------------------------------------|
+| `order.paid`      | Stripe confirmed payment                      |
+| `order.fulfilled` | Deliverable attached (static or `/fulfill`)   |
+| `order.refunded`  | Full refund issued                            |
+| `order.disputed`  | Stripe dispute opened                         |
+
+Listing lifecycle (create/publish/archive) is not emitted — the agent is the mutator, so it's self-knowledge.
+
+## Listing events
+
+Cursor-paginated. Filter by `type`, `listing_id`, `order_id`, and `after` (event ID).
+
+<CodeBlocks>
+<CodeBlock title="Python">
+```python
+result = client.events.list(type="order.paid", limit=50)
+
+for event in result.data:
+    print(event.id, event.type, event.order_id, event.created_at)
+
+if result.has_more:
+    next_page = client.events.list(
+        type="order.paid",
+        cursor=result.cursor,
+    )
+```
+</CodeBlock>
+<CodeBlock title="curl">
+```bash
+curl "https://api.listbee.so/v1/events?type=order.paid&limit=50" \
+  -H "Authorization: Bearer lb_..."
+```
+</CodeBlock>
+</CodeBlocks>
+
+## Event shape
+
+```json
+{
+  "object": "event",
+  "id": "evt_01J3K4M5N6P7Q8R9S0T1U2V3W4",
+  "type": "order.paid",
+  "account_id": "acc_7kQ2xY9mN3pR5tW1vB8a",
+  "listing_id": "lst_7kQ2xY9mN3pR5tW1vB8a",
+  "order_id": "ord_9xM4kP7nR2qT5wY1",
+  "created_at": "2026-04-17T10:23:00Z",
+  "data": {
+    "object": "order",
+    "id": "ord_9xM4kP7nR2qT5wY1",
+    "status": "paid",
+    "amount": 4900
+  }
+}
+```
+
+`data` is the same structured payload delivered to `agent_callback_url` — no follow-up API call needed to enrich it.
+
+## Reconciling missed webhooks
+
+Keep a cursor (last processed event ID) in durable storage. After a restart or outage, poll from the cursor forward:
+
+```python
+import time
+
+last_seen = load_cursor()  # e.g. from Redis or a local file
+
+while True:
+    page = client.events.list(after=last_seen, limit=100)
+    for event in page.data:
+        handle(event)
+        last_seen = event.id
+    save_cursor(last_seen)
+
+    if not page.has_more:
+        time.sleep(30)
+```
+
+This pattern works as a standalone channel (no webhook URL needed) or as a backstop behind a webhook consumer.
+
+## When to use events vs webhooks
+
+| Use case                                            | Prefer                  |
+|-----------------------------------------------------|-------------------------|
+| Real-time reaction, public HTTPS endpoint           | `agent_callback_url`    |
+| Stateless workers, no public endpoint               | `GET /v1/events` poll   |
+| Reconciliation after receiver outage                | `GET /v1/events` + cursor, or `POST /v1/orders/{id}/redeliver` |
+| Debugging or backfill of historical activity        | `GET /v1/events`        |
+
+Webhook delivery has retries and a circuit breaker — events are always durable regardless. See [Fulfillment](/fulfillment) for delivery mechanics.
+
+## Key fields
+
+| Field         | Type    | Description |
+|---------------|---------|-------------|
+| `id`          | string  | Event ID (`evt_`) — use as cursor |
+| `type`        | string  | `order.paid`, `order.fulfilled`, `order.refunded`, `order.disputed` |
+| `account_id`  | string  | Account that owns the event |
+| `listing_id`  | string  | Related listing, if applicable |
+| `order_id`    | string  | Related order, if applicable |
+| `created_at`  | string  | UTC timestamp |
+| `data`        | object  | Event payload — same shape as webhook delivery |
+
+## Related
+
+- [Fulfillment](/fulfillment) — webhook delivery, retries, redelivery
+- [Orders](/orders) — `POST /v1/orders/{id}/redeliver` for one-order replay

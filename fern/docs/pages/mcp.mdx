@@ -4,7 +4,7 @@ subtitle: Connect AI agents to your ListBee account using the Model Context Prot
 covers_endpoints: []
 ---
 
-ListBee ships an MCP server (`listbee-mcp`) that exposes your commerce API as tools any MCP-compatible agent can call. Agents can create listings, check orders, configure webhooks, and trigger fulfillment — without writing API integration code.
+ListBee ships an MCP server (`listbee-mcp`) that exposes the commerce API as tools any MCP-compatible agent can call. Agents can bootstrap an account, create listings, process orders, and fulfill async orders — without writing API integration code.
 
 ## Install
 
@@ -56,59 +56,47 @@ The package ships two transports from the same codebase:
 | **stdio** | `npx listbee-mcp` | Claude Desktop, Cursor, Cline, Claude Code |
 | **HTTP** | `mcp.listbee.so` | ChatGPT Apps, Claude API Connector, remote agents |
 
-For the HTTP transport, point your client at `https://mcp.listbee.so`. Requests are authenticated with your `LISTBEE_API_KEY` in the `Authorization` header.
+For the HTTP transport, point your client at `https://mcp.listbee.so`. Requests authenticate with `LISTBEE_API_KEY` in the `Authorization` header.
 
 MCP discovery is available at [listbee.so/.well-known/mcp.json](https://listbee.so/.well-known/mcp.json).
 
 ## Available tools
 
-The server exposes 27 tools covering the full API surface. Tools are grouped by resource:
+Grouped by resource:
+
+**Bootstrap**
+- `bootstrap_start` — send OTP to a human's email, begin onboarding
+- `bootstrap_verify` — verify OTP, receive API key and Stripe onboarding URL
+- `bootstrap_poll` — poll account readiness until Stripe is connected
 
 **Listings**
-- `create_listing` — create a draft listing
-- `get_listing` — retrieve a listing by ID
-- `list_listings` — paginate your listings
-- `update_listing` — update name, price, description, checkout schema
-- `delete_listing` — delete a draft listing
-- `add_deliverable` — attach a deliverable (file, URL, or text)
-- `set_deliverables` — replace all deliverables at once
-- `remove_deliverable` — remove a single deliverable
-- `remove_deliverables` — remove all deliverables
-- `publish_listing` — make a listing live
+- `create_listing` — create a draft or published listing with a deliverable, metadata, signing secret
+- `get_listing`, `list_listings`, `update_listing`, `delete_listing`
+- `publish_listing` — draft → published
 
 **Orders**
-- `list_orders` — paginate orders, filter by status or listing
-- `get_order` — retrieve an order and its buyer data
-- `fulfill_order` — push generated content to an order
-- `refund_order` — issue a full refund
-
-**Files**
-- `upload_file` — upload a file for use as a deliverable
-
-**Webhooks**
-- `create_webhook` — register a webhook endpoint
-- `list_webhooks` — list configured webhooks
-- `update_webhook` — change URL, secret, or event filters
-- `delete_webhook` — remove a webhook
-- `list_webhook_events` — inspect delivery history
-- `retry_webhook_event` — re-deliver a failed event
-- `test_webhook` — send a test payload
+- `list_orders` — paginate orders, filter by status (`paid`, `fulfilled`) or listing
+- `get_order`
+- `fulfill_order` — attach a deliverable to an async order
+- `refund_order` — full refund
+- `order_redeliver` — requeue webhook events for a single order
 
 **Account**
-- `get_account` — retrieve account details and readiness
-- `update_account` — update display name, bio, avatar
-- `start_stripe_connect` — begin Stripe Connect onboarding
-- `list_customers` — paginate buyers
-- `list_plans` — retrieve available billing plans
+- `get_account`, `update_account`, `delete_account`
+- `start_stripe_connect`, `disconnect_stripe`
+
+**API keys**
+- `api_key_self_revoke` — agent destroys its own credential (no multi-key CRUD in MCP)
 
 ## Readiness-aware responses
 
-Every listing and account response includes a `readiness` object with an `actions` array. Each action has a `code`, a `kind` (`api` or `human`), a human-readable `message`, and a `resolve` block with the exact method and endpoint to call next.
+Every account, listing, and order response includes a `readiness` object with an `actions` array. Each action has a `code`, a `kind` (`api` or `human`), a human-readable `message`, and a `resolve` block with the method and endpoint to call next.
 
-Agents should read `readiness.next` to know what to do after each step — the API walks agents through the setup sequence automatically.
+Agents should read `readiness.next` to know what to do after each step. See [Readiness](/readiness).
 
 ## Related
 
 - [Quickstart](/quickstart)
+- [Authentication](/authentication)
 - [SDKs](/sdks)
 - [API reference](/api-reference)

@@ -10,13 +10,13 @@ Rate limits are enforced per API key (or IP address if unauthenticated). Limits 
 
 | Category | Endpoints | Limit |
 |----------|-----------|-------|
-| Listings (read/write) | `GET`, `POST`, `PUT /v1/listings` and listing actions | 120 / minute |
-| Files | `POST /v1/files` | 60 / minute |
-| Webhooks | `GET /v1/webhooks`, `PUT /v1/webhooks/{id}`, `DELETE /v1/webhooks/{id}` | 20 / minute |
-| Webhook create/test/rotate | `POST /v1/webhooks`, `POST /v1/webhooks/{id}/test`, `POST /v1/webhooks/{id}/rotate-secret` | 5–10 / minute |
+| Listings (read/write) | `GET`, `POST`, `PATCH /v1/listings` and listing actions | 120 / minute |
+| Orders | `GET /v1/orders`, `POST /v1/orders/{id}/fulfill`, `/refund` | 120 / minute |
+| Order redelivery | `POST /v1/orders/{id}/redeliver` | 10 / hour per order, 100 / hour per API key |
+| Events | `GET /v1/events` | 120 / minute |
 | Account update | `PUT /v1/account` | 10 / minute |
-| API keys | `POST /v1/api-keys` | 10 / minute |
-| Stripe connect | `POST /v1/stripe` | 5 / minute |
+| Self-revoke | `POST /v1/api-keys/self-revoke` | unlimited |
+| Stripe connect | `POST /v1/account/stripe/connect` | 5 / minute |
 
 ## 429 response
 

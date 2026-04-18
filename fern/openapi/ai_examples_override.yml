@@ -2,964 +2,886 @@ paths:
   /v1/account:
     get:
       x-fern-examples:
-        - response:
-            body:
-              object: account
-              id: acc_7kQ2xY9mN3pR5tW1
-              email: seller@example.com
-              plan: free
-              fee_rate: '0.10'
-              billing_status: active
-              currency: usd
-              ga_measurement_id: G-ABC123XYZ
-              notify_orders: true
-              events_callback_url: https://agent.example.com/events
-              readiness:
-                operational: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
-              created_at: '2026-03-15T10:00:00Z'
-    put:
-      x-fern-examples:
-        - request:
+      - response:
+          body:
+            object: account
+            id: acc_7kQ2xY9mN3pR5tW1
+            email: seller@example.com
+            plan: free
+            fee_rate: '0.10'
+            billing_status: active
+            currency: usd
             ga_measurement_id: G-ABC123XYZ
             notify_orders: true
             events_callback_url: https://agent.example.com/events
-          response:
-            body:
-              object: account
-              id: acc_7kQ2xY9mN3pR5tW1
-              email: seller@example.com
-              plan: free
-              fee_rate: '0.10'
-              billing_status: active
-              currency: usd
-              ga_measurement_id: G-ABC123XYZ
-              notify_orders: true
-              events_callback_url: https://agent.example.com/events
-              readiness:
-                operational: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
-              created_at: '2026-03-15T10:00:00Z'
+            readiness:
+              operational: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: &id001
+                    secret_key: sk_live_...
+              next: stripe_connect_required
+            created_at: '2026-03-15T10:00:00Z'
+    put:
+      x-fern-examples:
+      - request:
+          ga_measurement_id: G-ABC123XYZ
+          notify_orders: true
+          events_callback_url: https://agent.example.com/events
+        response:
+          body:
+            object: account
+            id: acc_7kQ2xY9mN3pR5tW1
+            email: seller@example.com
+            plan: free
+            fee_rate: '0.10'
+            billing_status: active
+            currency: usd
+            ga_measurement_id: G-ABC123XYZ
+            notify_orders: true
+            events_callback_url: https://agent.example.com/events
+            readiness:
+              operational: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: stripe_connect_required
+            created_at: '2026-03-15T10:00:00Z'
   /v1/account/stripe:
     delete:
       x-fern-examples:
-        - response:
-            body: {}
+      - response:
+          body: {}
   /v1/account/stripe/connect:
     post:
       x-fern-examples:
-        - response:
-            body:
-              object: stripe_connect_session
-              url: https://connect.stripe.com/setup/...
-              expires_at: '2026-04-03T16:00:00Z'
+      - response:
+          body:
+            object: stripe_connect_session
+            url: https://connect.stripe.com/setup/...
+            expires_at: '2026-04-03T16:00:00Z'
   /v1/bootstrap/verify:
     post:
       x-fern-examples:
-        - request:
-            bootstrap_token: bst_abc123
-            otp_code: '123456'
-          response:
-            body:
-              object: bootstrap_result
-              account_id: acc_01J3K4M5N6P7Q8R9S0T1U2V3W4
-              api_key: lb_01J3K4M5N6P7Q8R9S0T1U2V3W4X5Y6Z7
-              stripe_onboarding_url: https://connect.stripe.com/setup/s/...
-              readiness:
-                operational: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
+      - request:
+          bootstrap_token: bst_abc123
+          otp_code: '123456'
+        response:
+          body:
+            object: bootstrap_result
+            account_id: acc_01J3K4M5N6P7Q8R9S0T1U2V3W4
+            api_key: lb_01J3K4M5N6P7Q8R9S0T1U2V3W4X5Y6Z7
+            stripe_onboarding_url: https://connect.stripe.com/setup/s/...
+            readiness:
+              operational: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: stripe_connect_required
   /v1/bootstrap/{account_id}:
     get:
       x-fern-examples:
-        - path-parameters:
-            account_id: account_id
-          response:
-            body:
-              object: bootstrap_status
-              ready: false
-              account_id: acc_01J3K4M5N6P7Q8R9S0T1U2V3W4
-              readiness:
-                operational: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
-              stripe_onboarding_url: https://connect.stripe.com/setup/s/...
+      - path-parameters:
+          account_id: account_id
+        response:
+          body:
+            object: bootstrap_status
+            ready: false
+            account_id: acc_01J3K4M5N6P7Q8R9S0T1U2V3W4
+            readiness:
+              operational: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: stripe_connect_required
+            stripe_onboarding_url: https://connect.stripe.com/setup/s/...
   /v1/events:
     get:
       x-fern-examples:
-        - response:
-            body:
-              object: list
+      - response:
+          body:
+            object: list
+            data:
+            - object: event
+              id: evt_abc123xyz
+              type: order.paid
+              account_id: acc_7kQ2xY9mN3pR5tW1vB8a
+              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+              order_id: ord_9xM4kP7nR2qT5wY1
+              created_at: '2026-04-02T14:30:00Z'
               data:
-                - object: event
-                  id: evt_abc123xyz
-                  type: order.paid
-                  account_id: acc_7kQ2xY9mN3pR5tW1vB8a
-                  listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
-                  order_id: ord_9xM4kP7nR2qT5wY1
-                  created_at: '2026-04-02T14:30:00Z'
-                  data:
-                    object: event
-                    type: order.paid
-              cursor: evt_abc123xyz
-              has_more: false
+                object: event
+                type: order.paid
+            cursor: evt_abc123xyz
+            has_more: false
   /v1/listings:
     get:
       x-fern-examples:
-        - response:
-            body:
-              object: list
-              data:
-                - object: listing
-                  id: lst_7kQ2xY9mN3pR5tW1vB8a
-                  short_code: seo-playbook
-                  name: SEO Playbook 2026
-                  tagline: The only SEO guide you need
-                  price: 2900
-                  compare_at_price: 4900
-                  cta: Get the Playbook
-                  badges:
-                    - Best seller
-                  highlights:
-                    - string
-                  status: published
-                  fulfillment_mode: async
-                  has_cover: true
-                  url: https://buy.listbee.so/seo-playbook
-                  created_at: '2026-04-01T12:00:00Z'
-              cursor: lst_7kQ2xY9mN3pR5tW1vB8a
-              has_more: false
+      - response:
+          body:
+            object: list
+            data:
+            - object: listing
+              id: lst_7kQ2xY9mN3pR5tW1vB8a
+              short_code: seo-playbook
+              name: SEO Playbook 2026
+              tagline: The only SEO guide you need
+              price: 2900
+              compare_at_price: 4900
+              cta: Get the Playbook
+              badges:
+              - Best seller
+              highlights:
+              - string
+              status: published
+              fulfillment_mode: async
+              has_cover: true
+              url: https://buy.listbee.so/seo-playbook
+              created_at: '2026-04-01T12:00:00Z'
+            cursor: lst_7kQ2xY9mN3pR5tW1vB8a
+            has_more: false
     post:
       x-fern-examples:
-        - request:
-            checkout_schema:
-              - key: size
-                label: Size
-                options:
-                  - S
-                  - M
-                  - L
-                type: select
-            name: SEO Playbook 2026
-            fulfillment_mode: async
-            deliverable:
-              schema_version: 0
-              id: string
-              type: url
-              value: string
-            agent_callback_url: string
-            price: 500
-            description: A comprehensive guide to modern SEO techniques.
-            tagline: Updated for 2026 algorithm changes
-            highlights:
+      - request:
+          checkout_schema:
+          - key: size
+            label: Size
+            options:
+            - S
+            - M
+            - L
+            type: select
+          name: SEO Playbook 2026
+          fulfillment_mode: async
+          deliverable:
+            schema_version: 0
+            id: string
+            type: url
+            value: string
+          agent_callback_url: string
+          price: 500
+          description: A comprehensive guide to modern SEO techniques.
+          tagline: Updated for 2026 algorithm changes
+          highlights:
+          - 50+ pages
+          - Actionable tips
+          - Free updates
+          cta: Get Instant Access
+          cover: covers/abc123.jpg
+          signing_secret: my-secret-value
+          metadata:
+            campaign: launch-week
+            source: n8n
+          utm_source: google
+          utm_medium: cpc
+          utm_campaign: spring-sale
+          compare_at_price: 3900
+          badges:
+          - Limited time
+          - Best seller
+          cover_blur: auto
+          rating: 4.8
+          rating_count: 1243
+          reviews:
+          - content: Best decision I've made for my health.
+            name: Clara D.
+            rating: 4.5
+          faqs:
+          - a: Yes, completely beginner-friendly.
+            q: Is this for beginners?
+        response:
+          body:
+            object: listing_with_secret
+            listing:
+              object: listing
+              id: lst_7kQ2xY9mN3pR5tW1vB8a
+              short_code: seo-playbook
+              name: SEO Playbook 2026
+              description: A comprehensive guide to modern SEO.
+              tagline: Updated for 2026 algorithm changes
+              highlights: &id002
               - 50+ pages
               - Actionable tips
-              - Free updates
-            cta: Get Instant Access
-            cover: covers/abc123.jpg
-            signing_secret: my-secret-value
-            metadata:
-              campaign: launch-week
-              source: n8n
-            utm_source: google
-            utm_medium: cpc
-            utm_campaign: spring-sale
-            compare_at_price: 3900
-            badges:
+              cta: Get Instant Access
+              price: 500
+              fulfillment_mode: async
+              deliverable:
+                object: deliverable
+                id: del_7kQ2xY9mN3pR5tW1vB8a01
+                type: url
+                status: ready
+                url: https://example.com/secret
+                content: 'Buy signal: AAPL'
+              agent_callback_url: https://my-agent.com/fulfill
+              checkout_schema:
+              - key: size
+                type: text
+                label: Shoe size
+                required: true
+                options: &id003
+                - S
+                - M
+                - L
+                sort_order: 0
+              has_cover: true
+              compare_at_price: 3900
+              badges: &id004
               - Limited time
-              - Best seller
-            cover_blur: auto
-            rating: 4.8
-            rating_count: 1243
-            reviews:
-              - content: Best decision I've made for my health.
-                name: Clara D.
-                rating: 4.5
-            faqs:
-              - a: Yes, completely beginner-friendly.
-                q: Is this for beginners?
-          response:
-            body:
-              object: listing_with_secret
-              listing:
-                object: listing
-                id: lst_7kQ2xY9mN3pR5tW1vB8a
-                short_code: seo-playbook
-                name: SEO Playbook 2026
-                description: A comprehensive guide to modern SEO.
-                tagline: Updated for 2026 algorithm changes
-                highlights:
-                  - 50+ pages
-                  - Actionable tips
-                cta: Get Instant Access
-                price: 500
-                fulfillment_mode: async
-                deliverable:
-                  object: deliverable
-                  id: del_7kQ2xY9mN3pR5tW1vB8a01
-                  type: url
-                  status: ready
-                  url: https://example.com/secret
-                  content: 'Buy signal: AAPL'
-                agent_callback_url: https://my-agent.com/fulfill
-                checkout_schema:
-                  - key: size
-                    type: text
-                    label: Shoe size
-                    required: true
-                    options:
-                      - S
-                      - M
-                      - L
-                    sort_order: 0
-                has_cover: true
-                compare_at_price: 3900
-                badges:
-                  - Limited time
-                cover_blur: auto
-                rating: 4.8
-                rating_count: 1243
-                reviews: []
-                faqs: []
-                metadata:
-                  source: n8n
-                signing_secret_preview: a1b2
-                utm_source: google
-                utm_medium: cpc
-                utm_campaign: spring-sale
-                status: published
-                url: https://buy.listbee.so/seo-playbook
-                embed_url: https://buy.listbee.so/seo-playbook?embed=true
-                readiness:
-                  sellable: true
-                  actions:
-                    - code: stripe_connect_required
-                      kind: api
-                      priority: required
-                      message: Set Stripe secret key to accept payments
-                      resolve:
-                        method: POST
-                        endpoint: /v1/account/stripe-key
-                        url: https://console.listbee.so/connect/stripe
-                        params:
-                          secret_key: sk_live_...
-                  next: stripe_connect_required
-                created_at: '2026-04-01T12:00:00Z'
-              signing_secret: Xk9mN2pR5tW1vB8aQ4nL7xY0zJ3eF6cH
+              cover_blur: auto
+              rating: 4.8
+              rating_count: 1243
+              reviews: &id005 []
+              faqs: &id006 []
+              metadata: &id007
+                source: n8n
+              signing_secret_preview: a1b2
+              utm_source: google
+              utm_medium: cpc
+              utm_campaign: spring-sale
+              status: published
+              url: https://buy.listbee.so/seo-playbook
+              embed_url: https://buy.listbee.so/seo-playbook?embed=true
+              readiness:
+                sellable: true
+                actions:
+                - code: stripe_connect_required
+                  kind: api
+                  priority: required
+                  message: Set Stripe secret key to accept payments
+                  resolve:
+                    method: POST
+                    endpoint: /v1/account/stripe-key
+                    url: https://console.listbee.so/connect/stripe
+                    params: *id001
+                next: stripe_connect_required
+              created_at: '2026-04-01T12:00:00Z'
+            signing_secret: Xk9mN2pR5tW1vB8aQ4nL7xY0zJ3eF6cH
   /v1/listings/{listing_id}:
     get:
       x-fern-examples:
-        - path-parameters:
-            listing_id: listing_id
-          response:
-            body:
-              object: listing
-              id: lst_7kQ2xY9mN3pR5tW1vB8a
-              short_code: seo-playbook
-              name: SEO Playbook 2026
-              description: A comprehensive guide to modern SEO.
-              tagline: Updated for 2026 algorithm changes
-              highlights:
-                - 50+ pages
-                - Actionable tips
-              cta: Get Instant Access
-              price: 500
-              fulfillment_mode: async
-              deliverable:
-                object: deliverable
-                id: del_7kQ2xY9mN3pR5tW1vB8a01
-                type: url
-                status: ready
-                url: https://example.com/secret
-                content: 'Buy signal: AAPL'
-              agent_callback_url: https://my-agent.com/fulfill
-              checkout_schema:
-                - key: size
-                  type: text
-                  label: Shoe size
-                  required: true
-                  options:
-                    - S
-                    - M
-                    - L
-                  sort_order: 0
-              has_cover: true
-              compare_at_price: 3900
-              badges:
-                - Limited time
-              cover_blur: auto
-              rating: 4.8
-              rating_count: 1243
-              reviews: []
-              faqs: []
-              metadata:
-                source: n8n
-              signing_secret_preview: a1b2
-              utm_source: google
-              utm_medium: cpc
-              utm_campaign: spring-sale
-              status: published
-              url: https://buy.listbee.so/seo-playbook
-              embed_url: https://buy.listbee.so/seo-playbook?embed=true
-              readiness:
-                sellable: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
-              created_at: '2026-04-01T12:00:00Z'
-    put:
-      x-fern-examples:
-        - path-parameters:
-            listing_id: listing_id
-          request:
+      - path-parameters:
+          listing_id: listing_id
+        response:
+          body:
+            object: listing
+            id: lst_7kQ2xY9mN3pR5tW1vB8a
+            short_code: seo-playbook
+            name: SEO Playbook 2026
+            description: A comprehensive guide to modern SEO.
+            tagline: Updated for 2026 algorithm changes
+            highlights: *id002
+            cta: Get Instant Access
+            price: 500
             fulfillment_mode: async
             deliverable:
-              schema_version: 0
-              id: string
+              object: deliverable
+              id: del_7kQ2xY9mN3pR5tW1vB8a01
               type: url
-              value: string
-            agent_callback_url: string
-            name: SEO Playbook 2026
-            price: 500
+              status: ready
+              url: https://example.com/secret
+              content: 'Buy signal: AAPL'
+            agent_callback_url: https://my-agent.com/fulfill
             checkout_schema:
-              - key: size
-                label: Size
-                options:
-                  - S
-                  - M
-                  - L
-                type: select
-            description: A comprehensive guide to modern SEO.
-            tagline: Updated for 2026
-            highlights:
-              - 50+ pages
-              - Free updates
-            cta: Get Instant Access
-            cover: covers/abc123.jpg
-            signing_secret: null
-            metadata:
-              source: n8n
-            utm_source: google
-            utm_medium: cpc
-            utm_campaign: spring-sale
+            - key: size
+              type: text
+              label: Shoe size
+              required: true
+              options: *id003
+              sort_order: 0
+            has_cover: true
             compare_at_price: 3900
-            badges:
-              - Best seller
+            badges: *id004
             cover_blur: auto
             rating: 4.8
             rating_count: 1243
-            reviews:
-              - name: Clara D.
-                rating: 4.5
-                content: Excellent quality content.
-            faqs:
-              - q: Is this for beginners?
-                a: Yes, completely beginner-friendly.
-          response:
-            body:
-              object: listing
-              id: lst_7kQ2xY9mN3pR5tW1vB8a
-              short_code: seo-playbook
-              name: SEO Playbook 2026
-              description: A comprehensive guide to modern SEO.
-              tagline: Updated for 2026 algorithm changes
-              highlights:
-                - 50+ pages
-                - Actionable tips
-              cta: Get Instant Access
-              price: 500
-              fulfillment_mode: async
-              deliverable:
-                object: deliverable
-                id: del_7kQ2xY9mN3pR5tW1vB8a01
-                type: url
-                status: ready
-                url: https://example.com/secret
-                content: 'Buy signal: AAPL'
-              agent_callback_url: https://my-agent.com/fulfill
-              checkout_schema:
-                - key: size
-                  type: text
-                  label: Shoe size
-                  required: true
-                  options:
-                    - S
-                    - M
-                    - L
-                  sort_order: 0
-              has_cover: true
-              compare_at_price: 3900
-              badges:
-                - Limited time
-              cover_blur: auto
-              rating: 4.8
-              rating_count: 1243
-              reviews: []
-              faqs: []
-              metadata:
-                source: n8n
-              signing_secret_preview: a1b2
-              utm_source: google
-              utm_medium: cpc
-              utm_campaign: spring-sale
-              status: published
-              url: https://buy.listbee.so/seo-playbook
-              embed_url: https://buy.listbee.so/seo-playbook?embed=true
-              readiness:
-                sellable: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
-              created_at: '2026-04-01T12:00:00Z'
+            reviews: *id005
+            faqs: *id006
+            metadata: *id007
+            signing_secret_preview: a1b2
+            utm_source: google
+            utm_medium: cpc
+            utm_campaign: spring-sale
+            status: published
+            url: https://buy.listbee.so/seo-playbook
+            embed_url: https://buy.listbee.so/seo-playbook?embed=true
+            readiness:
+              sellable: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: stripe_connect_required
+            created_at: '2026-04-01T12:00:00Z'
+    put:
+      x-fern-examples:
+      - path-parameters:
+          listing_id: listing_id
+        request:
+          fulfillment_mode: async
+          deliverable:
+            schema_version: 0
+            id: string
+            type: url
+            value: string
+          agent_callback_url: string
+          name: SEO Playbook 2026
+          price: 500
+          checkout_schema:
+          - key: size
+            label: Size
+            options:
+            - S
+            - M
+            - L
+            type: select
+          description: A comprehensive guide to modern SEO.
+          tagline: Updated for 2026
+          highlights:
+          - 50+ pages
+          - Free updates
+          cta: Get Instant Access
+          cover: covers/abc123.jpg
+          signing_secret: null
+          metadata:
+            source: n8n
+          utm_source: google
+          utm_medium: cpc
+          utm_campaign: spring-sale
+          compare_at_price: 3900
+          badges:
+          - Best seller
+          cover_blur: auto
+          rating: 4.8
+          rating_count: 1243
+          reviews:
+          - name: Clara D.
+            rating: 4.5
+            content: Excellent quality content.
+          faqs:
+          - q: Is this for beginners?
+            a: Yes, completely beginner-friendly.
+        response:
+          body:
+            object: listing
+            id: lst_7kQ2xY9mN3pR5tW1vB8a
+            short_code: seo-playbook
+            name: SEO Playbook 2026
+            description: A comprehensive guide to modern SEO.
+            tagline: Updated for 2026 algorithm changes
+            highlights: *id002
+            cta: Get Instant Access
+            price: 500
+            fulfillment_mode: async
+            deliverable:
+              object: deliverable
+              id: del_7kQ2xY9mN3pR5tW1vB8a01
+              type: url
+              status: ready
+              url: https://example.com/secret
+              content: 'Buy signal: AAPL'
+            agent_callback_url: https://my-agent.com/fulfill
+            checkout_schema:
+            - key: size
+              type: text
+              label: Shoe size
+              required: true
+              options: *id003
+              sort_order: 0
+            has_cover: true
+            compare_at_price: 3900
+            badges: *id004
+            cover_blur: auto
+            rating: 4.8
+            rating_count: 1243
+            reviews: *id005
+            faqs: *id006
+            metadata: *id007
+            signing_secret_preview: a1b2
+            utm_source: google
+            utm_medium: cpc
+            utm_campaign: spring-sale
+            status: published
+            url: https://buy.listbee.so/seo-playbook
+            embed_url: https://buy.listbee.so/seo-playbook?embed=true
+            readiness:
+              sellable: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: stripe_connect_required
+            created_at: '2026-04-01T12:00:00Z'
   /v1/listings/{listing_id}/archive:
     post:
       x-fern-examples:
-        - path-parameters:
-            listing_id: listing_id
-          response:
-            body:
-              object: listing
-              id: lst_7kQ2xY9mN3pR5tW1vB8a
-              short_code: seo-playbook
-              name: SEO Playbook 2026
-              description: A comprehensive guide to modern SEO.
-              tagline: Updated for 2026 algorithm changes
-              highlights:
-                - 50+ pages
-                - Actionable tips
-              cta: Get Instant Access
-              price: 500
-              fulfillment_mode: async
-              deliverable:
-                object: deliverable
-                id: del_7kQ2xY9mN3pR5tW1vB8a01
-                type: url
-                status: ready
-                url: https://example.com/secret
-                content: 'Buy signal: AAPL'
-              agent_callback_url: https://my-agent.com/fulfill
-              checkout_schema:
-                - key: size
-                  type: text
-                  label: Shoe size
-                  required: true
-                  options:
-                    - S
-                    - M
-                    - L
-                  sort_order: 0
-              has_cover: true
-              compare_at_price: 3900
-              badges:
-                - Limited time
-              cover_blur: auto
-              rating: 4.8
-              rating_count: 1243
-              reviews: []
-              faqs: []
-              metadata:
-                source: n8n
-              signing_secret_preview: a1b2
-              utm_source: google
-              utm_medium: cpc
-              utm_campaign: spring-sale
-              status: published
-              url: https://buy.listbee.so/seo-playbook
-              embed_url: https://buy.listbee.so/seo-playbook?embed=true
-              readiness:
-                sellable: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
-              created_at: '2026-04-01T12:00:00Z'
+      - path-parameters:
+          listing_id: listing_id
+        response:
+          body:
+            object: listing
+            id: lst_7kQ2xY9mN3pR5tW1vB8a
+            short_code: seo-playbook
+            name: SEO Playbook 2026
+            description: A comprehensive guide to modern SEO.
+            tagline: Updated for 2026 algorithm changes
+            highlights: *id002
+            cta: Get Instant Access
+            price: 500
+            fulfillment_mode: async
+            deliverable:
+              object: deliverable
+              id: del_7kQ2xY9mN3pR5tW1vB8a01
+              type: url
+              status: ready
+              url: https://example.com/secret
+              content: 'Buy signal: AAPL'
+            agent_callback_url: https://my-agent.com/fulfill
+            checkout_schema:
+            - key: size
+              type: text
+              label: Shoe size
+              required: true
+              options: *id003
+              sort_order: 0
+            has_cover: true
+            compare_at_price: 3900
+            badges: *id004
+            cover_blur: auto
+            rating: 4.8
+            rating_count: 1243
+            reviews: *id005
+            faqs: *id006
+            metadata: *id007
+            signing_secret_preview: a1b2
+            utm_source: google
+            utm_medium: cpc
+            utm_campaign: spring-sale
+            status: published
+            url: https://buy.listbee.so/seo-playbook
+            embed_url: https://buy.listbee.so/seo-playbook?embed=true
+            readiness:
+              sellable: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: stripe_connect_required
+            created_at: '2026-04-01T12:00:00Z'
   /v1/listings/{listing_id}/publish:
     post:
       x-fern-examples:
-        - path-parameters:
-            listing_id: listing_id
-          response:
-            body:
-              object: listing
-              id: lst_7kQ2xY9mN3pR5tW1vB8a
-              short_code: seo-playbook
-              name: SEO Playbook 2026
-              description: A comprehensive guide to modern SEO.
-              tagline: Updated for 2026 algorithm changes
-              highlights:
-                - 50+ pages
-                - Actionable tips
-              cta: Get Instant Access
-              price: 500
-              fulfillment_mode: async
-              deliverable:
-                object: deliverable
-                id: del_7kQ2xY9mN3pR5tW1vB8a01
-                type: url
-                status: ready
-                url: https://example.com/secret
-                content: 'Buy signal: AAPL'
-              agent_callback_url: https://my-agent.com/fulfill
-              checkout_schema:
-                - key: size
-                  type: text
-                  label: Shoe size
-                  required: true
-                  options:
-                    - S
-                    - M
-                    - L
-                  sort_order: 0
-              has_cover: true
-              compare_at_price: 3900
-              badges:
-                - Limited time
-              cover_blur: auto
-              rating: 4.8
-              rating_count: 1243
-              reviews: []
-              faqs: []
-              metadata:
-                source: n8n
-              signing_secret_preview: a1b2
-              utm_source: google
-              utm_medium: cpc
-              utm_campaign: spring-sale
-              status: published
-              url: https://buy.listbee.so/seo-playbook
-              embed_url: https://buy.listbee.so/seo-playbook?embed=true
-              readiness:
-                sellable: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
-              created_at: '2026-04-01T12:00:00Z'
+      - path-parameters:
+          listing_id: listing_id
+        response:
+          body:
+            object: listing
+            id: lst_7kQ2xY9mN3pR5tW1vB8a
+            short_code: seo-playbook
+            name: SEO Playbook 2026
+            description: A comprehensive guide to modern SEO.
+            tagline: Updated for 2026 algorithm changes
+            highlights: *id002
+            cta: Get Instant Access
+            price: 500
+            fulfillment_mode: async
+            deliverable:
+              object: deliverable
+              id: del_7kQ2xY9mN3pR5tW1vB8a01
+              type: url
+              status: ready
+              url: https://example.com/secret
+              content: 'Buy signal: AAPL'
+            agent_callback_url: https://my-agent.com/fulfill
+            checkout_schema:
+            - key: size
+              type: text
+              label: Shoe size
+              required: true
+              options: *id003
+              sort_order: 0
+            has_cover: true
+            compare_at_price: 3900
+            badges: *id004
+            cover_blur: auto
+            rating: 4.8
+            rating_count: 1243
+            reviews: *id005
+            faqs: *id006
+            metadata: *id007
+            signing_secret_preview: a1b2
+            utm_source: google
+            utm_medium: cpc
+            utm_campaign: spring-sale
+            status: published
+            url: https://buy.listbee.so/seo-playbook
+            embed_url: https://buy.listbee.so/seo-playbook?embed=true
+            readiness:
+              sellable: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: stripe_connect_required
+            created_at: '2026-04-01T12:00:00Z'
   /v1/listings/{listing_id}/unpublish:
     post:
       x-fern-examples:
-        - path-parameters:
-            listing_id: listing_id
-          response:
-            body:
-              object: listing
-              id: lst_7kQ2xY9mN3pR5tW1vB8a
-              short_code: seo-playbook
-              name: SEO Playbook 2026
-              description: A comprehensive guide to modern SEO.
-              tagline: Updated for 2026 algorithm changes
-              highlights:
-                - 50+ pages
-                - Actionable tips
-              cta: Get Instant Access
-              price: 500
-              fulfillment_mode: async
-              deliverable:
-                object: deliverable
-                id: del_7kQ2xY9mN3pR5tW1vB8a01
-                type: url
-                status: ready
-                url: https://example.com/secret
-                content: 'Buy signal: AAPL'
-              agent_callback_url: https://my-agent.com/fulfill
-              checkout_schema:
-                - key: size
-                  type: text
-                  label: Shoe size
-                  required: true
-                  options:
-                    - S
-                    - M
-                    - L
-                  sort_order: 0
-              has_cover: true
-              compare_at_price: 3900
-              badges:
-                - Limited time
-              cover_blur: auto
-              rating: 4.8
-              rating_count: 1243
-              reviews: []
-              faqs: []
-              metadata:
-                source: n8n
-              signing_secret_preview: a1b2
-              utm_source: google
-              utm_medium: cpc
-              utm_campaign: spring-sale
-              status: published
-              url: https://buy.listbee.so/seo-playbook
-              embed_url: https://buy.listbee.so/seo-playbook?embed=true
-              readiness:
-                sellable: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: stripe_connect_required
-              created_at: '2026-04-01T12:00:00Z'
+      - path-parameters:
+          listing_id: listing_id
+        response:
+          body:
+            object: listing
+            id: lst_7kQ2xY9mN3pR5tW1vB8a
+            short_code: seo-playbook
+            name: SEO Playbook 2026
+            description: A comprehensive guide to modern SEO.
+            tagline: Updated for 2026 algorithm changes
+            highlights: *id002
+            cta: Get Instant Access
+            price: 500
+            fulfillment_mode: async
+            deliverable:
+              object: deliverable
+              id: del_7kQ2xY9mN3pR5tW1vB8a01
+              type: url
+              status: ready
+              url: https://example.com/secret
+              content: 'Buy signal: AAPL'
+            agent_callback_url: https://my-agent.com/fulfill
+            checkout_schema:
+            - key: size
+              type: text
+              label: Shoe size
+              required: true
+              options: *id003
+              sort_order: 0
+            has_cover: true
+            compare_at_price: 3900
+            badges: *id004
+            cover_blur: auto
+            rating: 4.8
+            rating_count: 1243
+            reviews: *id005
+            faqs: *id006
+            metadata: *id007
+            signing_secret_preview: a1b2
+            utm_source: google
+            utm_medium: cpc
+            utm_campaign: spring-sale
+            status: published
+            url: https://buy.listbee.so/seo-playbook
+            embed_url: https://buy.listbee.so/seo-playbook?embed=true
+            readiness:
+              sellable: true
+              actions:
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: stripe_connect_required
+            created_at: '2026-04-01T12:00:00Z'
   /v1/orders:
     get:
       x-fern-examples:
-        - response:
-            body:
-              object: list
-              data:
-                - object: order
-                  id: ord_9xM4kP7nR2qT5wY1
-                  listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
-                  buyer_email: buyer@example.com
-                  amount: 2900
-                  currency: USD
-                  status: paid
-                  has_deliverables: false
-                  payment_status: paid
-                  platform_fee: 290
-                  refund_amount: 0
-                  dispute_status: needs_response
-                  paid_at: '2026-04-02T14:30:00Z'
-                  fulfilled_at: '2026-04-02T15:00:00Z'
-                  created_at: '2026-04-02T14:00:00Z'
-              cursor: ord_7kQ2xY9mN3pR5tW1vB8a
-              has_more: false
+      - response:
+          body:
+            object: list
+            data:
+            - object: order
+              id: ord_9xM4kP7nR2qT5wY1
+              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+              buyer_email: buyer@example.com
+              amount: 2900
+              currency: USD
+              status: paid
+              has_deliverables: false
+              payment_status: paid
+              platform_fee: 290
+              refund_amount: 0
+              dispute_status: needs_response
+              paid_at: '2026-04-02T14:30:00Z'
+              fulfilled_at: '2026-04-02T15:00:00Z'
+              created_at: '2026-04-02T14:00:00Z'
+            cursor: ord_7kQ2xY9mN3pR5tW1vB8a
+            has_more: false
   /v1/orders/{order_id}:
     get:
       x-fern-examples:
-        - path-parameters:
-            order_id: order_id
-          response:
-            body:
-              object: order
-              id: ord_9xM4kP7nR2qT5wY1
-              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
-              buyer_email: buyer@example.com
-              amount: 2900
-              currency: USD
-              status: paid
-              checkout_data:
-                note: Gift wrap please
-                size: M
-              has_deliverables: false
-              payment_status: paid
-              listing_snapshot:
-                name: SEO Playbook 2026
-                price: 2900
-                slug: seo-playbook-2026
-              seller_snapshot:
-                display_name: Acme Agency
-                email: seller@example.com
-              deliverable:
-                object: deliverable
-                id: del_7kQ2xY9mN3pR5tW1vB8a01
-                type: url
-                status: ready
-                url: https://example.com/secret
-                content: 'Buy signal: AAPL'
+      - path-parameters:
+          order_id: order_id
+        response:
+          body:
+            object: order
+            id: ord_9xM4kP7nR2qT5wY1
+            listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+            buyer_email: buyer@example.com
+            amount: 2900
+            currency: USD
+            status: paid
+            checkout_data: &id008
+              note: Gift wrap please
+              size: M
+            has_deliverables: false
+            payment_status: paid
+            listing_snapshot: &id009
+              name: SEO Playbook 2026
+              price: 2900
+              slug: seo-playbook-2026
+            seller_snapshot: &id010
+              display_name: Acme Agency
+              email: seller@example.com
+            deliverable:
+              object: deliverable
+              id: del_7kQ2xY9mN3pR5tW1vB8a01
+              type: url
+              status: ready
+              url: https://example.com/secret
+              content: 'Buy signal: AAPL'
+            actions:
+            - code: stripe_connect_required
+              kind: api
+              priority: required
+              message: Set Stripe secret key to accept payments
+              resolve:
+                method: POST
+                endpoint: /v1/account/stripe-key
+                url: https://console.listbee.so/connect/stripe
+                params: *id001
+            readiness:
+              fulfilled: true
               actions:
-                - code: stripe_connect_required
-                  kind: api
-                  priority: required
-                  message: Set Stripe secret key to accept payments
-                  resolve:
-                    method: POST
-                    endpoint: /v1/account/stripe-key
-                    url: https://console.listbee.so/connect/stripe
-                    params:
-                      secret_key: sk_live_...
-              readiness:
-                fulfilled: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: fulfillment_pending
-              stripe_payment_intent_id: pi_3abc123def456
-              platform_fee: 290
-              refund_amount: 0
-              refunded_at: '2026-04-01T15:30:00Z'
-              dispute_status: needs_response
-              dispute_reason: product_not_received
-              dispute_amount: 0
-              disputed_at: '2026-04-02T10:00:00Z'
-              metadata:
-                campaign: launch-week
-                source: n8n
-              unlock_url: https://buy.listbee.so/my-product?token=abc123
-              paid_at: '2026-04-02T14:30:00Z'
-              fulfilled_at: '2026-04-02T15:00:00Z'
-              created_at: '2026-04-02T14:00:00Z'
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: fulfillment_pending
+            stripe_payment_intent_id: pi_3abc123def456
+            platform_fee: 290
+            refund_amount: 0
+            refunded_at: '2026-04-01T15:30:00Z'
+            dispute_status: needs_response
+            dispute_reason: product_not_received
+            dispute_amount: 0
+            disputed_at: '2026-04-02T10:00:00Z'
+            metadata: &id011
+              campaign: launch-week
+              source: n8n
+            unlock_url: https://buy.listbee.so/my-product?token=abc123
+            paid_at: '2026-04-02T14:30:00Z'
+            fulfilled_at: '2026-04-02T15:00:00Z'
+            created_at: '2026-04-02T14:00:00Z'
   /v1/orders/{order_id}/fulfill:
     post:
       x-fern-examples:
-        - path-parameters:
-            order_id: order_id
-          request:
+      - path-parameters:
+          order_id: order_id
+        request:
+          deliverable:
+            type: url
+            value: https://example.com/secret-area
+          metadata:
+            generated_by: my-agent
+            version: '1'
+        response:
+          body:
+            object: order
+            id: ord_9xM4kP7nR2qT5wY1
+            listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+            buyer_email: buyer@example.com
+            amount: 2900
+            currency: USD
+            status: paid
+            checkout_data: *id008
+            has_deliverables: false
+            payment_status: paid
+            listing_snapshot: *id009
+            seller_snapshot: *id010
             deliverable:
+              object: deliverable
+              id: del_7kQ2xY9mN3pR5tW1vB8a01
               type: url
-              value: https://example.com/secret-area
-            metadata:
-              generated_by: my-agent
-              version: '1'
-          response:
-            body:
-              object: order
-              id: ord_9xM4kP7nR2qT5wY1
-              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
-              buyer_email: buyer@example.com
-              amount: 2900
-              currency: USD
-              status: paid
-              checkout_data:
-                note: Gift wrap please
-                size: M
-              has_deliverables: false
-              payment_status: paid
-              listing_snapshot:
-                name: SEO Playbook 2026
-                price: 2900
-                slug: seo-playbook-2026
-              seller_snapshot:
-                display_name: Acme Agency
-                email: seller@example.com
-              deliverable:
-                object: deliverable
-                id: del_7kQ2xY9mN3pR5tW1vB8a01
-                type: url
-                status: ready
-                url: https://example.com/secret
-                content: 'Buy signal: AAPL'
+              status: ready
+              url: https://example.com/secret
+              content: 'Buy signal: AAPL'
+            actions:
+            - code: stripe_connect_required
+              kind: api
+              priority: required
+              message: Set Stripe secret key to accept payments
+              resolve:
+                method: POST
+                endpoint: /v1/account/stripe-key
+                url: https://console.listbee.so/connect/stripe
+                params: *id001
+            readiness:
+              fulfilled: true
               actions:
-                - code: stripe_connect_required
-                  kind: api
-                  priority: required
-                  message: Set Stripe secret key to accept payments
-                  resolve:
-                    method: POST
-                    endpoint: /v1/account/stripe-key
-                    url: https://console.listbee.so/connect/stripe
-                    params:
-                      secret_key: sk_live_...
-              readiness:
-                fulfilled: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: fulfillment_pending
-              stripe_payment_intent_id: pi_3abc123def456
-              platform_fee: 290
-              refund_amount: 0
-              refunded_at: '2026-04-01T15:30:00Z'
-              dispute_status: needs_response
-              dispute_reason: product_not_received
-              dispute_amount: 0
-              disputed_at: '2026-04-02T10:00:00Z'
-              metadata:
-                campaign: launch-week
-                source: n8n
-              unlock_url: https://buy.listbee.so/my-product?token=abc123
-              paid_at: '2026-04-02T14:30:00Z'
-              fulfilled_at: '2026-04-02T15:00:00Z'
-              created_at: '2026-04-02T14:00:00Z'
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: fulfillment_pending
+            stripe_payment_intent_id: pi_3abc123def456
+            platform_fee: 290
+            refund_amount: 0
+            refunded_at: '2026-04-01T15:30:00Z'
+            dispute_status: needs_response
+            dispute_reason: product_not_received
+            dispute_amount: 0
+            disputed_at: '2026-04-02T10:00:00Z'
+            metadata: *id011
+            unlock_url: https://buy.listbee.so/my-product?token=abc123
+            paid_at: '2026-04-02T14:30:00Z'
+            fulfilled_at: '2026-04-02T15:00:00Z'
+            created_at: '2026-04-02T14:00:00Z'
   /v1/orders/{order_id}/refund:
     post:
       x-fern-examples:
-        - path-parameters:
-            order_id: order_id
-          response:
-            body:
-              object: order
-              id: ord_9xM4kP7nR2qT5wY1
-              listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
-              buyer_email: buyer@example.com
-              amount: 2900
-              currency: USD
-              status: paid
-              checkout_data:
-                note: Gift wrap please
-                size: M
-              has_deliverables: false
-              payment_status: paid
-              listing_snapshot:
-                name: SEO Playbook 2026
-                price: 2900
-                slug: seo-playbook-2026
-              seller_snapshot:
-                display_name: Acme Agency
-                email: seller@example.com
-              deliverable:
-                object: deliverable
-                id: del_7kQ2xY9mN3pR5tW1vB8a01
-                type: url
-                status: ready
-                url: https://example.com/secret
-                content: 'Buy signal: AAPL'
+      - path-parameters:
+          order_id: order_id
+        response:
+          body:
+            object: order
+            id: ord_9xM4kP7nR2qT5wY1
+            listing_id: lst_7kQ2xY9mN3pR5tW1vB8a
+            buyer_email: buyer@example.com
+            amount: 2900
+            currency: USD
+            status: paid
+            checkout_data: *id008
+            has_deliverables: false
+            payment_status: paid
+            listing_snapshot: *id009
+            seller_snapshot: *id010
+            deliverable:
+              object: deliverable
+              id: del_7kQ2xY9mN3pR5tW1vB8a01
+              type: url
+              status: ready
+              url: https://example.com/secret
+              content: 'Buy signal: AAPL'
+            actions:
+            - code: stripe_connect_required
+              kind: api
+              priority: required
+              message: Set Stripe secret key to accept payments
+              resolve:
+                method: POST
+                endpoint: /v1/account/stripe-key
+                url: https://console.listbee.so/connect/stripe
+                params: *id001
+            readiness:
+              fulfilled: true
               actions:
-                - code: stripe_connect_required
-                  kind: api
-                  priority: required
-                  message: Set Stripe secret key to accept payments
-                  resolve:
-                    method: POST
-                    endpoint: /v1/account/stripe-key
-                    url: https://console.listbee.so/connect/stripe
-                    params:
-                      secret_key: sk_live_...
-              readiness:
-                fulfilled: true
-                actions:
-                  - code: stripe_connect_required
-                    kind: api
-                    priority: required
-                    message: Set Stripe secret key to accept payments
-                    resolve:
-                      method: POST
-                      endpoint: /v1/account/stripe-key
-                      url: https://console.listbee.so/connect/stripe
-                      params:
-                        secret_key: sk_live_...
-                next: fulfillment_pending
-              stripe_payment_intent_id: pi_3abc123def456
-              platform_fee: 290
-              refund_amount: 0
-              refunded_at: '2026-04-01T15:30:00Z'
-              dispute_status: needs_response
-              dispute_reason: product_not_received
-              dispute_amount: 0
-              disputed_at: '2026-04-02T10:00:00Z'
-              metadata:
-                campaign: launch-week
-                source: n8n
-              unlock_url: https://buy.listbee.so/my-product?token=abc123
-              paid_at: '2026-04-02T14:30:00Z'
-              fulfilled_at: '2026-04-02T15:00:00Z'
-              created_at: '2026-04-02T14:00:00Z'
+              - code: stripe_connect_required
+                kind: api
+                priority: required
+                message: Set Stripe secret key to accept payments
+                resolve:
+                  method: POST
+                  endpoint: /v1/account/stripe-key
+                  url: https://console.listbee.so/connect/stripe
+                  params: *id001
+              next: fulfillment_pending
+            stripe_payment_intent_id: pi_3abc123def456
+            platform_fee: 290
+            refund_amount: 0
+            refunded_at: '2026-04-01T15:30:00Z'
+            dispute_status: needs_response
+            dispute_reason: product_not_received
+            dispute_amount: 0
+            disputed_at: '2026-04-02T10:00:00Z'
+            metadata: *id011
+            unlock_url: https://buy.listbee.so/my-product?token=abc123
+            paid_at: '2026-04-02T14:30:00Z'
+            fulfilled_at: '2026-04-02T15:00:00Z'
+            created_at: '2026-04-02T14:00:00Z'
   /v1/ping:
     get:
       x-fern-examples:
-        - response:
-            body:
-              object: ping
-              status: ok
+      - response:
+          body:
+            object: ping
+            status: ok
   /v1/plans:
     get:
       x-fern-examples:
-        - response:
-            body:
-              object: list
-              data:
-                - object: plan
-                  id: free
-                  name: Free
-                  tagline: Start instantly
-                  price_monthly: 0
-                  fee_rate: '0.10'
-              cursor: null
-              has_more: false
-  /v1/orders/order_id/redeliver:
-    post:
-      x-fern-examples:
-        - path-parameters:
-            order_id: order_id
-          response:
-            body:
-              object: redelivery_ack
-              order_id: ord_9xM4kP7nR2qT5wY1
-              scheduled_attempts: 1
+      - response:
+          body:
+            object: list
+            data:
+            - object: plan
+              id: free
+              name: Free
+              tagline: Start instantly
+              price_monthly: 0
+              fee_rate: '0.10'
+            cursor: null
+            has_more: false

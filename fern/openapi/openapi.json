@@ -375,6 +375,92 @@
         }
       }
     },
+    "/v1/files": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Upload file",
+        "description": "Upload a file for use as cover image, gallery image, or downloadable deliverable. Two modes: multipart binary upload, or JSON with source_url for server-side import. Returns a file object with fil_ prefixed ID.",
+        "operationId": "upload_file",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FileType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "File type (required for multipart)",
+              "title": "Type"
+            },
+            "description": "File type (required for multipart)"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "File uploaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "413": {
+            "description": "File too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid file type or missing metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/listings": {
       "post": {
         "tags": [
@@ -2404,6 +2490,24 @@
         ],
         "title": "ApiKeyResponse"
       },
+      "Body_upload_file": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "title": "Body_upload_file"
+      },
       "BootstrapPollResponse": {
         "properties": {
           "object": {
@@ -2745,16 +2849,53 @@
               "gbp"
             ]
           },
-          "deliverable": {
+          "cover_image_file_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliverableRequest"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Content to deliver automatically on payment. Omit for agent-fulfilled (ASYNC) listings."
+            "title": "Cover Image File Id",
+            "description": "File ID (fil_ prefixed) of a public_asset file for the cover image.",
+            "examples": [
+              "fil_7kQ2xY9mN3pR5tW1vB8a"
+            ]
+          },
+          "gallery_file_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gallery File Ids",
+            "description": "Array of file IDs (fil_ prefixed) for the product gallery. Max 5, order preserved.",
+            "examples": [
+              [
+                "fil_gal_1",
+                "fil_gal_2"
+              ]
+            ]
+          },
+          "deliverable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliverableInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Content to deliver on payment. Omit for ASYNC fulfillment."
           },
           "agent_callback_url": {
             "anyOf": [
@@ -2817,22 +2958,6 @@
                   "type": "select"
                 }
               ]
-            ]
-          },
-          "image_url": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image Url",
-            "description": "Cover image URL. Must use https://. Shown prominently on the product page. Recommended: 1200x630px.",
-            "examples": [
-              "https://cdn.example.com/covers/abc123.jpg"
             ]
           },
           "tagline": {
@@ -3064,16 +3189,16 @@
         "title": "CreateListingRequest",
         "description": "All optional display fields (name, description, tagline, highlights, cta, badges, image_url, reviews, faqs) appear on the product page buyers see."
       },
-      "DeliverableInputRequest": {
+      "DeliverableInput": {
         "properties": {
           "type": {
             "$ref": "#/components/schemas/DeliverableType",
-            "description": "Deliverable type: `url` (redirect link) or `text` (literal string).",
+            "description": "Deliverable type. `hosted_file`: buyer downloads a managed file. `external_url`: buyer redirected to URL. `text_content`: buyer sees rendered markdown.",
             "examples": [
-              "url"
+              "hosted_file"
             ]
           },
-          "content": {
+          "file_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -3082,43 +3207,40 @@
                 "type": "null"
               }
             ],
-            "title": "Content",
-            "description": "URL (https required) or text content. Required when type is `url` or `text`.",
+            "title": "File Id",
+            "description": "File ID (fil_ prefixed) from POST /v1/files. Required when type is `hosted_file`.",
             "examples": [
-              "https://example.com/secret-area"
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "type"
-        ],
-        "title": "DeliverableInputRequest",
-        "description": "Typed deliverable input. Shared by PUT /deliverables and POST /fulfill."
-      },
-      "DeliverableRequest": {
-        "properties": {
-          "type": {
-            "$ref": "#/components/schemas/DeliverableType",
-            "description": "Deliverable type: `url` (redirect link) or `text` (literal string).",
-            "examples": [
-              "url"
+              "fil_7kQ2xY9mN3pR5tW1vB8a"
             ]
           },
-          "content": {
+          "url": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 2048
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Content",
-            "description": "For `url` type: must start with http:// or https://. For `text` type: plain text content, max 10000 chars.",
+            "title": "Url",
+            "description": "Destination URL (https required). Required when type is `external_url`.",
             "examples": [
               "https://example.com/secret-area"
             ]
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "Text or markdown content. Required when type is `text_content`."
           }
         },
         "additionalProperties": false,
@@ -3126,19 +3248,15 @@
         "required": [
           "type"
         ],
-        "title": "DeliverableRequest",
-        "description": "Strict deliverable input for POST /v1/listings. Uses extra=forbid."
+        "title": "DeliverableInput"
       },
-      "DeliverableResponse": {
+      "DeliverableOutput": {
         "properties": {
           "type": {
             "$ref": "#/components/schemas/DeliverableType",
-            "description": "Deliverable type: `url` (redirect link) or `text` (inline string delivered to buyer).",
-            "examples": [
-              "url"
-            ]
+            "description": "Deliverable type."
           },
-          "content": {
+          "file_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -3147,11 +3265,44 @@
                 "type": "null"
               }
             ],
-            "title": "Content",
-            "description": "Deliverable content. Present on owner reads; null on public reads (buyers do not see it before purchase). For `url` type: a URL the buyer is redirected to. For `text` type: the literal string delivered.",
-            "examples": [
-              "https://example.com/secret-area"
-            ]
+            "title": "File Id",
+            "description": "File reference for hosted_file."
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename",
+            "description": "Original filename for hosted_file."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "URL for external_url. Null on non-owner reads."
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "Content for text_content. Null on non-owner reads."
           }
         },
         "additionalProperties": false,
@@ -3159,13 +3310,14 @@
         "required": [
           "type"
         ],
-        "title": "DeliverableResponse"
+        "title": "DeliverableOutput"
       },
       "DeliverableType": {
         "type": "string",
         "enum": [
-          "url",
-          "text"
+          "hosted_file",
+          "external_url",
+          "text_content"
         ],
         "title": "DeliverableType"
       },
@@ -3348,10 +3500,99 @@
         ],
         "title": "FaqItemInput"
       },
+      "FileResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "file",
+            "title": "Object",
+            "description": "Always `file`.",
+            "default": "file",
+            "examples": [
+              "file"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique file ID (fil_ prefixed).",
+            "examples": [
+              "fil_7kQ2xY9mN3pR5tW1vB8a"
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/FileType",
+            "description": "File access level.",
+            "examples": [
+              "public_asset"
+            ]
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Original filename.",
+            "examples": [
+              "cover.jpg"
+            ]
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "description": "File size in bytes.",
+            "examples": [
+              245760
+            ]
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type",
+            "description": "MIME type.",
+            "examples": [
+              "image/jpeg"
+            ]
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Public CDN URL. Present only for public_asset. Null for private_deliverable."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Upload timestamp."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "filename",
+          "size_bytes",
+          "mime_type",
+          "created_at"
+        ],
+        "title": "FileResponse"
+      },
+      "FileType": {
+        "type": "string",
+        "enum": [
+          "public_asset",
+          "private_deliverable"
+        ],
+        "title": "FileType"
+      },
       "FulfillOrderRequest": {
         "properties": {
           "deliverable": {
-            "$ref": "#/components/schemas/DeliverableInputRequest",
+            "$ref": "#/components/schemas/DeliverableInput",
             "description": "Generated content to deliver to the buyer. Type must be url (redirect link) or text (literal string). ListBee emails the buyer a permanent unlock link and transitions the order to FULFILLED."
           },
           "metadata": {
@@ -3391,7 +3632,7 @@
       "FulfillmentMode": {
         "type": "string",
         "enum": [
-          "static",
+          "managed",
           "async"
         ],
         "title": "FulfillmentMode"
@@ -3475,7 +3716,7 @@
               "MANAGED"
             ]
           },
-          "image_url": {
+          "cover_image_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -3484,11 +3725,23 @@
                 "type": "null"
               }
             ],
-            "title": "Image Url",
-            "description": "Cover image URL (https://). Shown prominently on the product page. Null if not set.",
-            "examples": [
-              "https://cdn.example.com/covers/abc123.jpg"
-            ]
+            "title": "Cover Image Url",
+            "description": "Resolved CDN URL for the managed cover image. Null if no cover set."
+          },
+          "gallery_image_urls": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gallery Image Urls",
+            "description": "Resolved CDN URLs for gallery images. Null if no gallery set."
           },
           "agent_callback_url": {
             "anyOf": [
@@ -3508,13 +3761,13 @@
           "deliverable": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliverableResponse"
+                "$ref": "#/components/schemas/DeliverableOutput"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "The stored deliverable ListBee delivers automatically on payment. Null for ASYNC listings. Content is redacted on non-owner reads."
+            "description": "Deliverable attached to this listing. Null for ASYNC listings."
           },
           "readiness": {
             "$ref": "#/components/schemas/ListingReadiness",
@@ -3804,7 +4057,7 @@
               "MANAGED"
             ]
           },
-          "image_url": {
+          "cover_image_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -3813,11 +4066,23 @@
                 "type": "null"
               }
             ],
-            "title": "Image Url",
-            "description": "Cover image URL (https://). Shown prominently on the product page. Null if not set.",
-            "examples": [
-              "https://cdn.example.com/covers/abc123.jpg"
-            ]
+            "title": "Cover Image Url",
+            "description": "Resolved CDN URL for the managed cover image. Null if no cover set."
+          },
+          "gallery_image_urls": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gallery Image Urls",
+            "description": "Resolved CDN URLs for gallery images. Null if no gallery set."
           },
           "agent_callback_url": {
             "anyOf": [
@@ -3837,13 +4102,13 @@
           "deliverable": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliverableResponse"
+                "$ref": "#/components/schemas/DeliverableOutput"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "The stored deliverable ListBee delivers automatically on payment. Null for ASYNC listings. Content is redacted on non-owner reads."
+            "description": "Deliverable attached to this listing. Null for ASYNC listings."
           },
           "readiness": {
             "$ref": "#/components/schemas/ListingReadiness",
@@ -4305,7 +4570,7 @@
               "MANAGED"
             ]
           },
-          "image_url": {
+          "cover_image_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -4314,11 +4579,8 @@
                 "type": "null"
               }
             ],
-            "title": "Image Url",
-            "description": "Cover image URL. Null if not set.",
-            "examples": [
-              "https://cdn.example.com/covers/abc123.jpg"
-            ]
+            "title": "Cover Image Url",
+            "description": "Resolved CDN URL for the managed cover image. Null if no cover set."
           },
           "created_at": {
             "type": "string",
@@ -4569,7 +4831,7 @@
           "deliverable": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliverableResponse"
+                "$ref": "#/components/schemas/DeliverableOutput"
               },
               {
                 "type": "null"
@@ -5418,10 +5680,47 @@
               "eur"
             ]
           },
+          "cover_image_file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image File Id",
+            "description": "File ID (fil_ prefixed) of a public_asset file for the cover image. Pass null to remove. Omit to leave unchanged.",
+            "examples": [
+              "fil_7kQ2xY9mN3pR5tW1vB8a"
+            ]
+          },
+          "gallery_file_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gallery File Ids",
+            "description": "Array of file IDs (fil_ prefixed) for the product gallery. Max 5, order preserved. Pass empty array to clear. Omit to leave unchanged.",
+            "examples": [
+              [
+                "fil_gal_1",
+                "fil_gal_2"
+              ]
+            ]
+          },
           "deliverable": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliverableRequest"
+                "$ref": "#/components/schemas/DeliverableInput"
               },
               {
                 "type": "null"
@@ -5477,22 +5776,6 @@
             ],
             "title": "Checkout Schema",
             "description": "Replace the entire checkout schema (full replace, not merge). Pass an empty array to clear all custom fields. Omit to leave the current schema unchanged. Max 5 fields. Email is always collected."
-          },
-          "image_url": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image Url",
-            "description": "Updated cover image URL. Must use https://. Pass null to remove. Omit to leave unchanged.",
-            "examples": [
-              "https://cdn.example.com/covers/updated.jpg"
-            ]
           },
           "tagline": {
             "anyOf": [
